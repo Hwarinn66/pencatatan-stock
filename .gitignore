@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env*
+!.env.example
+certificates/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+database.test.sql
