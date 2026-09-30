@@ -1,0 +1,98 @@
+@import "tailwindcss";
+:root {
+  --background: #f5f7f9;
+  --foreground: #172b36;
+  --primary: #047857;
+  --radius: 0.65rem;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+select,
+textarea {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  padding: 9px 12px;
+  font: inherit;
+  max-width: 100%;
+}
+textarea {
+  min-height: 100px;
+}
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #526272;
+  margin-bottom: 6px;
+}
+th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  background: #f8fafc;
+}
+th,
+td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #eef2f6;
+  white-space: nowrap;
+}
+tbody tr:hover {
+  background: #fafcfb;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.025em;
+}
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+.print-only {
+  display: none;
+}
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-label {
+    border: 2px solid black !important;
+    box-shadow: none !important;
+    width: 90mm;
+    margin: 0 auto;
+    break-inside: avoid;
+  }
+  .print-label img {
+    width: 65mm !important;
+    height: 65mm !important;
+    margin: auto;
+  }
+  .print-only {
+    display: block;
+  }
+}
