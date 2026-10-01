@@ -1,12 +1,31 @@
 import { hierarchyJoins } from "./locations";
 import { z } from "zod";
 import { rows } from "@/lib/db";
-import { listSchema } from "@/validators";
+import { listSchema, productListSchema } from "@/validators";
 import { productSelect } from "./products";
 import { transactionSelect } from "./transactions";
-import type { Product, StockTransaction } from "@/types";
+import type { Product, InventoryProduct, StockTransaction } from "@/types";
 type Filters = z.infer<typeof listSchema>;
-export async function listProducts(f: Filters) {
+export async function listProducts(f: z.infer<typeof productListSchema>) {
+  // Fix one database/server timestamp for both count and page, never use client time.
+  const [{ as_of }] = await rows<{ as_of: string }>(
+    "SELECT UTC_TIMESTAMP(3) as_of",
+  );
+  const windowStart = new Date(
+    new Date(as_of.replace(" ", "T") + "Z").getTime() -
+      f.movement_days * 86400000,
+  )
+    .toISOString()
+    .slice(0, 23)
+    .replace("T", " ");
+  const movementJoin = ` LEFT JOIN (
+    SELECT product_id,SUM(quantity) out_total,
+      SUM(CASE WHEN approved_at>=? THEN quantity ELSE 0 END) out_period
+    FROM stock_transactions
+    WHERE transaction_type='OUT' AND status='APPROVED' AND approved_at<=?
+    GROUP BY product_id
+  ) mv ON mv.product_id=p.id`;
+
   const where = ["1=1"];
   const args: unknown[] = [];
   if (f.active !== "all") {
@@ -43,27 +62,70 @@ export async function listProducts(f: Filters) {
     where.push(
       { low: "p.stock<=2", zero: "p.stock=0", safe: "p.stock>2" }[f.stock],
     );
+  if (f.sort === "fast") {
+    where.push("COALESCE(mv.out_period,0)>=?");
+    args.push(f.fast_threshold);
+  }
+  if (f.sort === "slow") {
+    where.push("COALESCE(mv.out_period,0)<?");
+    args.push(f.fast_threshold);
+  }
   const clause = " WHERE " + where.join(" AND ");
+  const direction =
+    f.direction ?? (["stock", "out_total"].includes(f.sort) ? "desc" : "asc");
   const sorts: Record<string, string> = {
-    id: "p.id",
-    sku: "p.sku",
-    name: "p.name",
-    stock: "p.stock",
-    location: "l.code",
+    id: `p.id ${direction}`,
+    sku: `p.sku ${direction}`,
+    name: `p.name ${direction}`,
+    stock: `p.stock ${direction},p.name ASC`,
+    out_total: `COALESCE(mv.out_total,0) ${direction},p.name ASC`,
+    // Rack and slot numbers are integers: A.02 comes before A.10 and A.100.
+    location: `b.code ${direction},r.rack_number ${direction},l.position_number ${direction},p.name ASC`,
+    fast: "p.name ASC",
+    slow: "p.name ASC",
+    movement:
+      "CASE WHEN COALESCE(mv.out_period,0)>=? THEN 0 ELSE 1 END ASC,p.name ASC",
   };
+  const queryArgs = [windowStart, as_of, ...args];
   const [{ total }] = await rows<{ total: number }>(
     "SELECT COUNT(*) total FROM products p JOIN locations l ON l.id=p.location_id" +
       hierarchyJoins +
+      movementJoin +
       clause,
-    args,
+    queryArgs,
   );
-  const items = await rows<Product>(
-    productSelect +
+  const items = await rows<Product & { out_total: number; out_period: number }>(
+    productSelect.replace(
+      "SELECT p.*,",
+      "SELECT p.*,COALESCE(mv.out_total,0) out_total,COALESCE(mv.out_period,0) out_period,",
+    ) +
+      movementJoin +
       clause +
-      ` ORDER BY ${sorts[f.sort] || "p.id"} ${f.direction},p.id ${f.export ? "" : `LIMIT ${f.limit} OFFSET ${(f.page - 1) * f.limit}`}`,
-    args,
+      ` ORDER BY ${sorts[f.sort]},p.id ASC ${f.export ? "" : `LIMIT ${f.limit} OFFSET ${(f.page - 1) * f.limit}`}`,
+    f.sort === "movement" ? [...queryArgs, f.fast_threshold] : queryArgs,
   );
-  return { items, total, page: f.page, limit: f.limit };
+  const enriched: InventoryProduct[] = items.map((p) => ({
+    ...p,
+    out_total: Number(p.out_total),
+    out_period: Number(p.out_period),
+    out_per_day: Number((Number(p.out_period) / f.movement_days).toFixed(3)),
+    movement_class: Number(p.out_period) >= f.fast_threshold ? "FAST" : "SLOW",
+    movement_days: f.movement_days,
+    fast_threshold: f.fast_threshold,
+    movement_as_of: as_of,
+  }));
+  return {
+    items: enriched,
+    total,
+    page: f.page,
+    limit: f.limit,
+    movement: {
+      days: f.movement_days,
+      fast_threshold: f.fast_threshold,
+      window_start: windowStart,
+      as_of,
+    },
+  };
 }
 // Date filters use the same configured timezone as display. Compute midnight offsets via Intl (including DST).
 export function dateBoundary(day: string, next = false) {

@@ -77,3 +77,23 @@ export const listSchema = z.object({
   to: z.iso.date().optional(),
   export: z.enum(["csv"]).optional(),
 });
+
+// Product ordering is independent of history's newest-first default.
+export const productListSchema = listSchema.extend({
+  sort: z
+    .enum([
+      "name",
+      "sku",
+      "id",
+      "stock",
+      "out_total",
+      "location",
+      "fast",
+      "slow",
+      "movement",
+    ])
+    .default("name"),
+  direction: z.enum(["asc", "desc"]).optional(),
+  movement_days: z.coerce.number().int().min(1).max(365).default(30),
+  fast_threshold: z.coerce.number().int().min(1).max(2147483647).default(10),
+});

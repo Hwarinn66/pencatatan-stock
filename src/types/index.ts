@@ -63,3 +63,13 @@ export interface LocationLookup extends Lookup {
   product_name?: string | null;
   legacy_code?: string | null;
 }
+
+export interface InventoryProduct extends Product {
+  out_total: number;
+  out_period: number;
+  out_per_day: number;
+  movement_class: "FAST" | "SLOW";
+  movement_days: number;
+  fast_threshold: number;
+  movement_as_of: string;
+}

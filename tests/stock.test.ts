@@ -78,3 +78,22 @@ test("location codes reset position per rack and preserve numbers above 99", () 
   assert.equal(locationCode("A", 2, 1), "A.02.01");
   assert.equal(locationCode("A", 100, 123), "A.100.123");
 });
+
+test("product sorting defaults and movement parameter limits", async () => {
+  const { productListSchema, listSchema } = await import("../src/validators");
+  const defaults = productListSchema.parse({});
+  assert.equal(defaults.sort, "name");
+  assert.equal(defaults.movement_days, 30);
+  assert.equal(defaults.fast_threshold, 10);
+  assert.equal(listSchema.parse({}).sort, "id");
+  for (const input of [
+    { sort: "name; DROP TABLE products" },
+    { movement_days: 0 },
+    { movement_days: 366 },
+    { movement_days: 1.5 },
+    { fast_threshold: 0 },
+    { fast_threshold: -1 },
+    { fast_threshold: 1.5 },
+  ])
+    assert.equal(productListSchema.safeParse(input).success, false);
+});

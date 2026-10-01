@@ -44,6 +44,34 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 
 Untuk instalasi baru, cukup import `database.sql` terbaru; **tidak perlu menjalankan migrasi**. Uji migrasi otomatis: `npm run test:migration` menggunakan database sementara acak dan memerlukan izin CREATE/DROP DATABASE pada server test. Script menolak konfigurasi DB_NAME yang tidak berakhiran `_test`.
 
+## Urutan barang dan Fast/Slow moving
+
+Di **Barang**, pilih menu **Urutkan**:
+
+| Pilihan                                 | Hasil                                                                               |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nama A–Z (default)                      | Semua barang sesuai filter, alfabetis tanpa memisahkan fast/slow                    |
+| Stok terbanyak                          | Stok saat ini terbesar dahulu; nama A–Z jika sama                                   |
+| Total OUT terbanyak                     | Jumlah unit OUT APPROVED dari seluruh histori, terbesar dahulu                      |
+| Lokasi A.01.01 → terakhir               | Blok, nomor rak, lalu nomor posisi; angka 2 sebelum 10 dan 100                      |
+| Kelompok Fast → Slow, masing-masing A–Z | Kelompok Fast A–Z lebih dahulu, kemudian Slow A–Z, dengan pemisah kelompok di tabel |
+| Fast moving saja · A–Z                  | Hanya barang fast, nama alfabetis, bukan quantity terbesar                          |
+| Slow moving saja · A–Z                  | Hanya barang slow, nama alfabetis                                                   |
+
+Klasifikasi memakai **jumlah unit keluar dalam periode berjalan**, bukan stok tersisa atau jumlah scan. Nilai awal operasional: **30 hari terakhir**, fast jika **OUT ≥10 unit**, slow jika **OUT <10 unit**. Periode dapat dipilih (7/30/60/90/180/365 hari) dan ambang unit bisa diubah lewat tombol **Terapkan**. Ini parameter tampilan saat ini, bukan standar industri atau pengaturan global yang disimpan. Rata-rata OUT per hari = OUT periode / jumlah hari periode. Nilai ini tidak dinormalisasi menurut umur barang; barang baru dengan sedikit histori perlu dinilai dengan konteks itu.
+
+- Hanya `transaction_type='OUT'`, `status='APPROVED'`, dan waktu `approved_at` yang dihitung. Pending, cancelled, IN dan adjustment diabaikan.
+- Barang dengan OUT 0 dalam periode termasuk **Slow** dengan keterangan **Belum ada OUT dalam periode**. Total OUT sepanjang histori masih dapat lebih besar dari 0.
+- Batas periode bergulir dihitung dari waktu UTC database saat permintaan, misalnya 30 × 24 jam terakhir. Transaksi dengan tanggal approve di masa depan tidak dihitung.
+- Kolom tabel: Total OUT, OUT periode, rata-rata unit/hari, dan label Fast/Slow. Jumlah memakai satuan masing-masing barang; perbandingan PCS dengan unit lain perlu konteks.
+- Sorting, filter kategori/ruangan/posisi/stok/status, pagination dan CSV dikerjakan backend SQL. Fast/Slow dikelompokkan **sebelum pagination**. Export CSV mempertahankan filter/urutan dan mencantumkan periode, ambang serta waktu evaluasi UTC.
+- Tampilan default berisi barang aktif. Gunakan filter status **Semua status** jika juga ingin melihat barang nonaktif.
+- Tidak memerlukan migrasi SQL baru jika database sudah menggunakan v2 lokasi bertingkat.
+
+API produk menambah `sort=name|stock|out_total|location|movement|fast|slow|sku|id`, `movement_days=1..365`, `fast_threshold=1..2147483647`. Default produk adalah `name` A–Z. Urutan stock/out_total default descending; `fast`, `slow`, `movement` selalu A–Z di dalam kelompok meskipun client mengirim direction lain. Histori tetap default transaksi terbaru dahulu. Contoh: `/api/products?sort=fast&movement_days=30&fast_threshold=10`.
+
+Uji database khusus fitur ini: **`npm run test:reports`**, memakai `.env.test` dan database disposable berakhiran `_test`. Suite membuat dan membersihkan fixture sendiri.
+
 ## Persyaratan
 
 - Windows 10/11, Laragon dan MySQL **8.0.16+** atau MariaDB **10.6+**, engine InnoDB. Versi ini diperlukan untuk generated columns dan CHECK constraints.

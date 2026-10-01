@@ -1,6 +1,6 @@
 "use client";
 import { LocationPicker } from "@/components/location-picker";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -10,7 +10,12 @@ import { useLive } from "@/hooks/use-live";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { Product, Lookup, LocationLookup } from "@/types";
+import type {
+  Product,
+  InventoryProduct,
+  Lookup,
+  LocationLookup,
+} from "@/types";
 import { Heading, State, StockBadge, Pager, useData } from "./shared";
 import { HistoryPage } from "./management";
 export function ProductsPage({ low = false }: { low?: boolean }) {
@@ -22,7 +27,9 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
   const [stock, setStock] = useState(low ? "low" : "");
   const [active, setActive] = useState("1");
   const [sort, setSort] = useState("name");
-  const [direction, setDirection] = useState("asc");
+  const [days, setDays] = useState("30");
+  const [threshold, setThreshold] = useState(10);
+  const [draftThreshold, setDraftThreshold] = useState("10");
   const [page, setPage] = useState(1);
   useEffect(() => {
     setQ(new URLSearchParams(location.search).get("q") || "");
@@ -31,14 +38,16 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
     q,
     page: String(page),
     sort,
-    direction,
+    direction: ["stock", "out_total"].includes(sort) ? "desc" : "asc",
+    movement_days: days,
+    fast_threshold: String(threshold),
     active,
     ...(category ? { category_id: category } : {}),
     ...(rack ? { location_id: rack } : {}),
     ...(roomFilter ? { room_id: roomFilter } : {}),
     ...(stock ? { stock } : {}),
   });
-  const list = useData<{ items: Product[]; total: number }>(
+  const list = useData<{ items: InventoryProduct[]; total: number }>(
     "products?" + params,
     version,
   );
@@ -151,19 +160,69 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
             value={sort}
             onChange={(e) => reset(() => setSort(e.target.value))}
           >
-            <option value="name">Nama</option>
-            <option value="sku">SKU</option>
-            <option value="stock">Stock</option>
-            <option value="location">Rak</option>
+            <option value="name">Nama A–Z (default)</option>
+            <option value="stock">Stok terbanyak</option>
+            <option value="out_total">Total OUT terbanyak (semua waktu)</option>
+            <option value="location">Lokasi A.01.01 → terakhir</option>
+            <option value="movement">
+              Kelompok Fast → Slow, masing-masing A–Z
+            </option>
+            <option value="fast">Fast moving saja · A–Z</option>
+            <option value="slow">Slow moving saja · A–Z</option>
+            <option value="sku">SKU A–Z</option>
           </select>
-          <select
-            aria-label="Arah urutan"
-            value={direction}
-            onChange={(e) => reset(() => setDirection(e.target.value))}
+        </div>
+        <div className="border-t border-slate-100 mt-4 pt-4 flex flex-wrap gap-4 items-end">
+          <div>
+            <label htmlFor="movement-days">Periode fast / slow moving</label>
+            <select
+              id="movement-days"
+              value={days}
+              onChange={(e) => reset(() => setDays(e.target.value))}
+            >
+              {[7, 30, 60, 90, 180, 365].map((d) => (
+                <option key={d} value={d}>
+                  {d} hari terakhir
+                </option>
+              ))}
+            </select>
+          </div>
+          <form
+            className="flex gap-2 items-end"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const n = Number(draftThreshold);
+              if (Number.isInteger(n) && n > 0 && n <= 2147483647)
+                reset(() => setThreshold(n));
+            }}
           >
-            <option value="asc">Naik</option>
-            <option value="desc">Turun</option>
-          </select>
+            <div>
+              <label htmlFor="fast-threshold">
+                Minimal unit OUT untuk fast moving
+              </label>
+              <Input
+                id="fast-threshold"
+                type="number"
+                min="1"
+                max="2147483647"
+                step="1"
+                required
+                value={draftThreshold}
+                onChange={(e) => setDraftThreshold(e.target.value)}
+                className="w-44"
+              />
+            </div>
+            <Button variant="outline" type="submit">
+              Terapkan
+            </Button>
+          </form>
+          <p className="text-xs text-slate-500 max-w-xl">
+            Fast: ≥ {threshold} unit OUT dalam {days} hari terakhir. Slow: &lt;{" "}
+            {threshold} unit. Hanya transaksi OUT APPROVED yang dihitung. Total
+            OUT memakai seluruh histori. Barang tanpa OUT dalam periode masuk
+            slow dan ditandai. Bandingkan jumlah dengan memperhatikan satuan
+            barang.
+          </p>
         </div>
       </Card>
       <State
@@ -182,6 +241,10 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                   "Kategori",
                   "Stock",
                   "Satuan",
+                  "Total OUT",
+                  `OUT ${days} hari`,
+                  "Rata-rata / hari",
+                  "Pergerakan",
                   "Lokasi",
                   "Status",
                   "Action",
@@ -191,71 +254,118 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {list.data.items.map((p) => (
-                <tr key={p.id}>
-                  <td className="text-xs text-slate-500">{p.sku}</td>
-                  <td className="font-semibold">
-                    <Link href={"/products/" + p.id}>{p.name}</Link>
-                  </td>
-                  <td className="text-xs">{p.category_name}</td>
-                  <td
-                    className={`font-bold ${p.stock <= 2 ? "text-red-700" : ""}`}
-                  >
-                    {p.stock}
-                  </td>
-                  <td className="text-xs">{p.unit}</td>
-                  <td>
-                    <span className="bg-slate-100 rounded px-2 py-1 text-xs">
-                      {p.location_code}
-                    </span>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {p.room_name}
-                    </p>
-                  </td>
-                  <td>
-                    {p.active ? (
-                      <StockBadge stock={p.stock} />
-                    ) : (
-                      <span className="text-xs text-slate-400">NONAKTIF</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex gap-3 text-xs text-emerald-700">
-                      <Link href={"/products/" + p.id}>Detail</Link>
-                      <Link href={`/products/${p.id}/edit`}>Edit</Link>
-                      <Link
-                        aria-label={"QR " + p.name}
-                        href={`/products/${p.id}/qr`}
-                      >
-                        <QrCode size={16} />
-                      </Link>
-                      <button
-                        className="text-slate-500"
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              `${p.active ? "Nonaktifkan" : "Aktifkan"} ${p.name}?`,
-                            )
-                          )
-                            return;
-                          try {
-                            await write(
-                              "products/" + p.id,
-                              { active: !p.active },
-                              "PATCH",
-                            );
-                            toast.success("Status barang diperbarui");
-                            void list.reload();
-                          } catch (e) {
-                            toast.error((e as Error).message);
+              {list.data.items.map((p, index) => (
+                <Fragment key={p.id}>
+                  {sort === "movement" &&
+                    (index === 0 ||
+                      list.data?.items[index - 1]?.movement_class !==
+                        p.movement_class) && (
+                      <tr>
+                        <th
+                          colSpan={12}
+                          scope="rowgroup"
+                          className={
+                            p.movement_class === "FAST"
+                              ? "bg-emerald-50 text-emerald-800"
+                              : "bg-amber-50 text-amber-800"
                           }
-                        }}
+                        >
+                          {p.movement_class === "FAST"
+                            ? "Fast moving"
+                            : "Slow moving"}{" "}
+                          · Nama A–Z
+                        </th>
+                      </tr>
+                    )}
+                  <tr>
+                    <td className="text-xs text-slate-500">{p.sku}</td>
+                    <td className="font-semibold">
+                      <Link href={"/products/" + p.id}>{p.name}</Link>
+                    </td>
+                    <td className="text-xs">{p.category_name}</td>
+                    <td
+                      className={`font-bold ${p.stock <= 2 ? "text-red-700" : ""}`}
+                    >
+                      {p.stock}
+                    </td>
+                    <td className="text-xs">{p.unit}</td>
+                    <td className="font-semibold tabular-nums">
+                      {p.out_total}
+                    </td>
+                    <td className="tabular-nums">{p.out_period}</td>
+                    <td className="text-xs text-slate-500">
+                      {p.out_per_day.toLocaleString("id-ID", {
+                        maximumFractionDigits: 3,
+                      })}{" "}
+                      {p.unit}/hari
+                    </td>
+                    <td>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-1 rounded ${p.movement_class === "FAST" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}
                       >
-                        {p.active ? "Nonaktifkan" : "Aktifkan"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        {p.movement_class === "FAST"
+                          ? "FAST MOVING"
+                          : "SLOW MOVING"}
+                      </span>
+                      {p.out_period === 0 && (
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Belum ada OUT dalam periode
+                        </p>
+                      )}
+                    </td>
+                    <td>
+                      <span className="bg-slate-100 rounded px-2 py-1 text-xs">
+                        {p.location_code}
+                      </span>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {p.room_name}
+                      </p>
+                    </td>
+                    <td>
+                      {p.active ? (
+                        <StockBadge stock={p.stock} />
+                      ) : (
+                        <span className="text-xs text-slate-400">NONAKTIF</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="flex gap-3 text-xs text-emerald-700">
+                        <Link href={"/products/" + p.id}>Detail</Link>
+                        <Link href={`/products/${p.id}/edit`}>Edit</Link>
+                        <Link
+                          aria-label={"QR " + p.name}
+                          href={`/products/${p.id}/qr`}
+                        >
+                          <QrCode size={16} />
+                        </Link>
+                        <button
+                          className="text-slate-500"
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                `${p.active ? "Nonaktifkan" : "Aktifkan"} ${p.name}?`,
+                              )
+                            )
+                              return;
+                            try {
+                              await write(
+                                "products/" + p.id,
+                                { active: !p.active },
+                                "PATCH",
+                              );
+                              toast.success("Status barang diperbarui");
+                              void list.reload();
+                            } catch (e) {
+                              toast.error((e as Error).message);
+                            }
+                          }}
+                        >
+                          {p.active ? "Nonaktifkan" : "Aktifkan"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

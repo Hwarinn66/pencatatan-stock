@@ -3,7 +3,7 @@
 ## Lulus di lingkungan pengembangan
 
 - Build produksi Next.js 16.3.7, TypeScript strict.
-- 8 unit tests: aritmetika IN/OUT, validasi quantity dan overflow, status stok, token QR, penolakan input stock/foto SVG, batas tanggal Asia/Jakarta, CSV formula escaping.
+- 9 unit tests: aritmetika IN/OUT, validasi quantity dan overflow, status stok, token QR, penolakan input stock/foto SVG, batas tanggal Asia/Jakarta, CSV formula escaping.
 - 14 tests termasuk parent suite pada **MariaDB 10.11.14**, memakai schema `database.sql` yang diimpor ke database test terpisah:
   - Create barang menghasilkan UUID dan stok 0.
   - OUT pada stok 0 ditolak tanpa membuat pending.
@@ -42,3 +42,7 @@ Database pengujian adalah MariaDB Linux, bukan instalasi Laragon Windows Anda. S
 - MariaDB: dua barang aktif pada posisi berbeda dalam satu rak; scan pending kedua barang diperbolehkan; posisi duplikat ditolak; perubahan identitas posisi terpakai diblokir.
 - Migrasi v1 → v2 diuji pada database sementara sungguhan, termasuk kode lama tidak standar, alias rak, stok/UUID/ID tetap, dan snapshot transaksi pending lama tidak ditulis ulang.
 - Form memilih ruangan/blok/rak/posisi, pengelolaan master, dan label cetak tetap memerlukan pemeriksaan visual di perangkat pengguna sesuai batas verifikasi di atas.
+
+## Verifikasi urutan barang dan movement
+
+`npm run test:reports` lulus pada MariaDB: 10 tests termasuk parent suite, mencakup nama default A–Z, stock descending, total OUT approved sepanjang histori, lokasi numerik (01/02/10/100), Fast A–Z, Slow A–Z termasuk 0 OUT, Fast lalu Slow A–Z, perubahan periode/ambang, pagination, filter dan CSV. Transaksi cancelled/pending/IN/adjustment serta approved timestamp di masa depan tidak ikut agregasi. Build produksi, TypeScript, 9 unit tests dan HTTP/SSE smoke test juga lulus pada revisi ini. UI browser dan perangkat fisik belum diverifikasi ulang.

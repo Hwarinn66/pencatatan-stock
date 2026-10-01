@@ -72,7 +72,9 @@ async function handler(req: Request, { params }: Context) {
     }
     if (resource === "products") {
       if (!key && method === "GET") {
-        const f = filter(),
+        const f = schemas.productListSchema.parse(
+            Object.fromEntries(url.searchParams),
+          ),
           result = await listProducts(f);
         return f.export
           ? csv(
@@ -86,6 +88,13 @@ async function handler(req: Request, { params }: Context) {
                 "location_code",
                 "room_name",
                 "active",
+                "out_total",
+                "out_period",
+                "out_per_day",
+                "movement_class",
+                "movement_days",
+                "fast_threshold",
+                "movement_as_of",
               ],
               "barang",
             )
