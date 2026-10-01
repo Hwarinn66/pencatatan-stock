@@ -7,22 +7,10 @@ import { transactionSelect } from "./transactions";
 import type { Product, InventoryProduct, StockTransaction } from "@/types";
 type Filters = z.infer<typeof listSchema>;
 export async function listProducts(f: z.infer<typeof productListSchema>) {
-  // Fix one database/server timestamp for both count and page, never use client time.
-  const [{ as_of }] = await rows<{ as_of: string }>(
-    "SELECT UTC_TIMESTAMP(3) as_of",
-  );
-  const windowStart = new Date(
-    new Date(as_of.replace(" ", "T") + "Z").getTime() -
-      f.movement_days * 86400000,
-  )
-    .toISOString()
-    .slice(0, 23)
-    .replace("T", " ");
+  // OUT totals support a separate ranking only; manual labels never depend on them.
   const movementJoin = ` LEFT JOIN (
-    SELECT product_id,SUM(quantity) out_total,
-      SUM(CASE WHEN approved_at>=? THEN quantity ELSE 0 END) out_period
-    FROM stock_transactions
-    WHERE transaction_type='OUT' AND status='APPROVED' AND approved_at<=?
+    SELECT product_id,SUM(quantity) out_total FROM stock_transactions
+    WHERE transaction_type='OUT' AND status='APPROVED' AND approved_at<=UTC_TIMESTAMP(3)
     GROUP BY product_id
   ) mv ON mv.product_id=p.id`;
 
@@ -63,13 +51,14 @@ export async function listProducts(f: z.infer<typeof productListSchema>) {
       { low: "p.stock<=2", zero: "p.stock=0", safe: "p.stock>2" }[f.stock],
     );
   if (f.sort === "fast") {
-    where.push("COALESCE(mv.out_period,0)>=?");
-    args.push(f.fast_threshold);
+    where.push("p.movement_class=?");
+    args.push("FAST");
   }
   if (f.sort === "slow") {
-    where.push("COALESCE(mv.out_period,0)<?");
-    args.push(f.fast_threshold);
+    where.push("p.movement_class=?");
+    args.push("SLOW");
   }
+  if (f.sort === "unlabelled") where.push("p.movement_class IS NULL");
   const clause = " WHERE " + where.join(" AND ");
   const direction =
     f.direction ?? (["stock", "out_total"].includes(f.sort) ? "desc" : "asc");
@@ -84,9 +73,10 @@ export async function listProducts(f: z.infer<typeof productListSchema>) {
     fast: "p.name ASC",
     slow: "p.name ASC",
     movement:
-      "CASE WHEN COALESCE(mv.out_period,0)>=? THEN 0 ELSE 1 END ASC,p.name ASC",
+      "CASE p.movement_class WHEN 'FAST' THEN 0 WHEN 'SLOW' THEN 1 ELSE 2 END ASC,p.name ASC",
+    unlabelled: "p.name ASC",
   };
-  const queryArgs = [windowStart, as_of, ...args];
+  const queryArgs = args;
   const [{ total }] = await rows<{ total: number }>(
     "SELECT COUNT(*) total FROM products p JOIN locations l ON l.id=p.location_id" +
       hierarchyJoins +
@@ -94,37 +84,21 @@ export async function listProducts(f: z.infer<typeof productListSchema>) {
       clause,
     queryArgs,
   );
-  const items = await rows<Product & { out_total: number; out_period: number }>(
+  const items = await rows<InventoryProduct>(
     productSelect.replace(
       "SELECT p.*,",
-      "SELECT p.*,COALESCE(mv.out_total,0) out_total,COALESCE(mv.out_period,0) out_period,",
+      "SELECT p.*,COALESCE(mv.out_total,0) out_total,",
     ) +
       movementJoin +
       clause +
       ` ORDER BY ${sorts[f.sort]},p.id ASC ${f.export ? "" : `LIMIT ${f.limit} OFFSET ${(f.page - 1) * f.limit}`}`,
-    f.sort === "movement" ? [...queryArgs, f.fast_threshold] : queryArgs,
+    queryArgs,
   );
-  const enriched: InventoryProduct[] = items.map((p) => ({
-    ...p,
-    out_total: Number(p.out_total),
-    out_period: Number(p.out_period),
-    out_per_day: Number((Number(p.out_period) / f.movement_days).toFixed(3)),
-    movement_class: Number(p.out_period) >= f.fast_threshold ? "FAST" : "SLOW",
-    movement_days: f.movement_days,
-    fast_threshold: f.fast_threshold,
-    movement_as_of: as_of,
-  }));
   return {
-    items: enriched,
+    items: items.map((p) => ({ ...p, out_total: Number(p.out_total) })),
     total,
     page: f.page,
     limit: f.limit,
-    movement: {
-      days: f.movement_days,
-      fast_threshold: f.fast_threshold,
-      window_start: windowStart,
-      as_of,
-    },
   };
 }
 // Date filters use the same configured timezone as display. Compute midnight offsets via Intl (including DST).

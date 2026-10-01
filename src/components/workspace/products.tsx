@@ -27,9 +27,6 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
   const [stock, setStock] = useState(low ? "low" : "");
   const [active, setActive] = useState("1");
   const [sort, setSort] = useState("name");
-  const [days, setDays] = useState("30");
-  const [threshold, setThreshold] = useState(10);
-  const [draftThreshold, setDraftThreshold] = useState("10");
   const [page, setPage] = useState(1);
   useEffect(() => {
     setQ(new URLSearchParams(location.search).get("q") || "");
@@ -39,8 +36,6 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
     page: String(page),
     sort,
     direction: ["stock", "out_total"].includes(sort) ? "desc" : "asc",
-    movement_days: days,
-    fast_threshold: String(threshold),
     active,
     ...(category ? { category_id: category } : {}),
     ...(rack ? { location_id: rack } : {}),
@@ -84,7 +79,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
         <div className="flex flex-wrap gap-3">
           <Input
             aria-label="Cari barang"
-            placeholder="Cari nama, SKU, lokasi…"
+            placeholder="Cari nama, kode barang, lokasi…"
             className="max-w-xs"
             value={q}
             onChange={(e) => reset(() => setQ(e.target.value))}
@@ -169,61 +164,15 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
             </option>
             <option value="fast">Fast moving saja · A–Z</option>
             <option value="slow">Slow moving saja · A–Z</option>
-            <option value="sku">SKU A–Z</option>
+            <option value="unlabelled">Belum diberi label · A–Z</option>
+            <option value="sku">Kode Barang A–Z</option>
           </select>
         </div>
-        <div className="border-t border-slate-100 mt-4 pt-4 flex flex-wrap gap-4 items-end">
-          <div>
-            <label htmlFor="movement-days">Periode fast / slow moving</label>
-            <select
-              id="movement-days"
-              value={days}
-              onChange={(e) => reset(() => setDays(e.target.value))}
-            >
-              {[7, 30, 60, 90, 180, 365].map((d) => (
-                <option key={d} value={d}>
-                  {d} hari terakhir
-                </option>
-              ))}
-            </select>
-          </div>
-          <form
-            className="flex gap-2 items-end"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const n = Number(draftThreshold);
-              if (Number.isInteger(n) && n > 0 && n <= 2147483647)
-                reset(() => setThreshold(n));
-            }}
-          >
-            <div>
-              <label htmlFor="fast-threshold">
-                Minimal unit OUT untuk fast moving
-              </label>
-              <Input
-                id="fast-threshold"
-                type="number"
-                min="1"
-                max="2147483647"
-                step="1"
-                required
-                value={draftThreshold}
-                onChange={(e) => setDraftThreshold(e.target.value)}
-                className="w-44"
-              />
-            </div>
-            <Button variant="outline" type="submit">
-              Terapkan
-            </Button>
-          </form>
-          <p className="text-xs text-slate-500 max-w-xl">
-            Fast: ≥ {threshold} unit OUT dalam {days} hari terakhir. Slow: &lt;{" "}
-            {threshold} unit. Hanya transaksi OUT APPROVED yang dihitung. Total
-            OUT memakai seluruh histori. Barang tanpa OUT dalam periode masuk
-            slow dan ditandai. Bandingkan jumlah dengan memperhatikan satuan
-            barang.
-          </p>
-        </div>
+        <p className="border-t border-slate-100 mt-4 pt-4 text-xs text-slate-500">
+          Fast/Slow adalah label manual dari master barang. Pilih melalui
+          Tambah/Edit Barang. Total OUT hanya dipakai untuk urutan OUT terbanyak
+          dan tidak mengubah label.
+        </p>
       </Card>
       <State
         error={list.error}
@@ -236,14 +185,12 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
             <thead>
               <tr>
                 {[
-                  "SKU",
+                  "Kode Barang",
                   "Nama Barang",
                   "Kategori",
                   "Stock",
                   "Satuan",
                   "Total OUT",
-                  `OUT ${days} hari`,
-                  "Rata-rata / hari",
                   "Pergerakan",
                   "Lokasi",
                   "Status",
@@ -262,7 +209,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                         p.movement_class) && (
                       <tr>
                         <th
-                          colSpan={12}
+                          colSpan={10}
                           scope="rowgroup"
                           className={
                             p.movement_class === "FAST"
@@ -272,13 +219,17 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                         >
                           {p.movement_class === "FAST"
                             ? "Fast moving"
-                            : "Slow moving"}{" "}
+                            : p.movement_class === "SLOW"
+                              ? "Slow moving"
+                              : "Belum diberi label"}{" "}
                           · Nama A–Z
                         </th>
                       </tr>
                     )}
                   <tr>
-                    <td className="text-xs text-slate-500">{p.sku}</td>
+                    <td className="font-mono text-base font-bold text-slate-900">
+                      {p.sku}
+                    </td>
                     <td className="font-semibold">
                       <Link href={"/products/" + p.id}>{p.name}</Link>
                     </td>
@@ -292,26 +243,16 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                     <td className="font-semibold tabular-nums">
                       {p.out_total}
                     </td>
-                    <td className="tabular-nums">{p.out_period}</td>
-                    <td className="text-xs text-slate-500">
-                      {p.out_per_day.toLocaleString("id-ID", {
-                        maximumFractionDigits: 3,
-                      })}{" "}
-                      {p.unit}/hari
-                    </td>
                     <td>
                       <span
-                        className={`text-[10px] font-bold px-2 py-1 rounded ${p.movement_class === "FAST" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}
+                        className={`text-[10px] font-bold px-2 py-1 rounded ${p.movement_class === "FAST" ? "bg-emerald-50 text-emerald-700" : p.movement_class === "SLOW" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-500"}`}
                       >
                         {p.movement_class === "FAST"
                           ? "FAST MOVING"
-                          : "SLOW MOVING"}
+                          : p.movement_class === "SLOW"
+                            ? "SLOW MOVING"
+                            : "BELUM DIBERI LABEL"}
                       </span>
-                      {p.out_period === 0 && (
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Belum ada OUT dalam periode
-                        </p>
-                      )}
                     </td>
                     <td>
                       <span className="bg-slate-100 rounded px-2 py-1 text-xs">
@@ -415,6 +356,7 @@ export function ProductForm({ id }: { id?: number }) {
               name: String(f.get("name")),
               category_id: Number(f.get("category_id")),
               unit: String(f.get("unit")),
+              movement_class: f.get("movement_class") || null,
               location_id: Number(f.get("location_id")),
               description: String(f.get("description")),
               image,
@@ -455,7 +397,7 @@ export function ProductForm({ id }: { id?: number }) {
             <h2 className="text-base font-semibold mb-5">Informasi barang</h2>
             <div className="grid sm:grid-cols-2 gap-5">
               <div>
-                <label htmlFor="sku">SKU / Kode Barang</label>
+                <label htmlFor="sku">Kode Barang</label>
                 <Input
                   id="sku"
                   name="sku"
@@ -463,8 +405,12 @@ export function ProductForm({ id }: { id?: number }) {
                   maxLength={64}
                   defaultValue={initial?.sku}
                   disabled={!!id}
-                  placeholder="BRG-004"
+                  placeholder="a0001"
                 />
+                <p className="text-xs text-slate-400 mt-2">
+                  Kode unik setiap varian: a0001 untuk Ember 1 kg, a0002 untuk
+                  Ember 1,2 kg. Cantumkan kapasitas pada nama barang.
+                </p>
               </div>
               <div>
                 <label htmlFor="name">Nama Barang</label>
@@ -504,6 +450,24 @@ export function ProductForm({ id }: { id?: number }) {
                   maxLength={20}
                   defaultValue={initial?.unit || "PCS"}
                 />
+              </div>
+              <div>
+                <label htmlFor="movement_class">
+                  Label pergerakan (manual)
+                </label>
+                <select
+                  id="movement_class"
+                  name="movement_class"
+                  defaultValue={initial?.movement_class || ""}
+                  className="w-full"
+                >
+                  <option value="">Belum diberi label</option>
+                  <option value="FAST">Fast moving</option>
+                  <option value="SLOW">Slow moving</option>
+                </select>
+                <p className="text-xs text-slate-400 mt-2">
+                  Pilih sesuai klasifikasi gudang Anda. Tidak dihitung dari OUT.
+                </p>
               </div>
               <LocationPicker
                 locations={locations.data}
@@ -617,7 +581,10 @@ export function ProductDetail({
       >
         <Card className="print-label text-center">
           <h2 className="font-bold text-xl uppercase">{p.name}</h2>
-          <p className="text-sm mt-3">SKU: {p.sku}</p>
+          <p className="text-[10px] tracking-widest text-slate-500 mt-4">
+            KODE BARANG
+          </p>
+          <p className="font-mono text-3xl font-black tracking-wide">{p.sku}</p>
           <p className="font-bold mt-1">LOKASI: {p.location_code}</p>
           <p className="text-xs mt-1">{p.room_name}</p>
           <img
@@ -687,6 +654,15 @@ export function ProductDetail({
                 ["Ruangan", p.room_name || "—"],
                 ["Lokasi", p.location_code],
                 ["Satuan", p.unit],
+                ["Kode Barang", p.sku],
+                [
+                  "Label pergerakan",
+                  p.movement_class === "FAST"
+                    ? "Fast moving"
+                    : p.movement_class === "SLOW"
+                      ? "Slow moving"
+                      : "Belum diberi label",
+                ],
                 ["Dibuat", timestamp(p.created_at, settings.data?.timezone)],
                 [
                   "Diperbarui",

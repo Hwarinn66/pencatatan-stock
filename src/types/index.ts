@@ -4,6 +4,7 @@ export interface Product {
   name: string;
   category_id: number;
   category_name: string;
+  movement_class: "FAST" | "SLOW" | null;
   unit: string;
   stock: number;
   location_id: number;
@@ -66,10 +67,4 @@ export interface LocationLookup extends Lookup {
 
 export interface InventoryProduct extends Product {
   out_total: number;
-  out_period: number;
-  out_per_day: number;
-  movement_class: "FAST" | "SLOW";
-  movement_days: number;
-  fast_threshold: number;
-  movement_as_of: string;
 }

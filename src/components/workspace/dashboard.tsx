@@ -66,9 +66,11 @@ function PendingCard({
             <Badge value="PENDING" />
           </div>
           <h3 className="text-base font-semibold">{item.name}</h3>
+          <p className="text-[10px] text-slate-400 mt-3">KODE BARANG</p>
+          <p className="font-mono text-xl font-bold">{item.sku}</p>
           <p className="text-xs text-slate-500 mt-1">
-            {item.sku} · {item.room_name || "Ruangan lama"} · Lokasi{" "}
-            {item.location_code} · {item.transaction_number}
+            {item.room_name || "Ruangan lama"} · Lokasi {item.location_code} ·{" "}
+            {item.transaction_number}
           </p>
           <p className="text-[11px] text-slate-400 mt-2">
             Scan {timestamp(item.scanned_at, timezone)}

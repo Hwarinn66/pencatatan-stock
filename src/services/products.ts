@@ -49,7 +49,7 @@ export async function createProduct(input: z.infer<typeof productSchema>) {
     await checkRack(input.location_id, 0, conn);
     await checkCategory(input.category_id, conn);
     const result = await execute(
-      "INSERT INTO products(sku,name,category_id,unit,location_id,qr_token,image,description) VALUES (?,?,?,?,?,?,?,?)",
+      "INSERT INTO products(sku,name,category_id,unit,location_id,qr_token,image,description,movement_class) VALUES (?,?,?,?,?,?,?,?,?)",
       [
         input.sku,
         input.name,
@@ -59,6 +59,7 @@ export async function createProduct(input: z.infer<typeof productSchema>) {
         randomUUID(),
         input.image ?? null,
         input.description ?? null,
+        input.movement_class ?? null,
       ],
       conn,
     );
@@ -77,7 +78,7 @@ export async function editProduct(
     if (updated.active) await checkRack(updated.location_id, id, conn);
     await checkCategory(updated.category_id, conn);
     await execute(
-      "UPDATE products SET name=?,category_id=?,unit=?,location_id=?,description=?,image=?,active=? WHERE id=?",
+      "UPDATE products SET name=?,category_id=?,unit=?,location_id=?,description=?,image=?,active=?,movement_class=? WHERE id=?",
       [
         updated.name,
         updated.category_id,
@@ -86,6 +87,7 @@ export async function editProduct(
         updated.description ?? null,
         updated.image ?? null,
         updated.active ? 1 : 0,
+        updated.movement_class ?? null,
         id,
       ],
       conn,

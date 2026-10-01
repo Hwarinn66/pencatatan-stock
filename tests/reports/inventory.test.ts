@@ -1,3 +1,4 @@
+import { editProduct, createProduct } from "../../src/services/products";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -9,7 +10,7 @@ if (!process.env.DB_NAME?.endsWith("_test"))
 after(async () => {
   await db.end();
 });
-test("inventory ordering and movement categories use approved OUT quantities", async (t) => {
+test("inventory ordering uses manual labels independent of approved OUT quantities", async (t) => {
   const prefix = "SORT-" + randomUUID().slice(0, 8);
   let room: number | undefined,
     category: number | undefined,
@@ -78,6 +79,10 @@ test("inventory ordering and movement categories use approved OUT quantities", a
         )
       ).insertId;
     }
+    for (const name of ["Alpha", "Gamma", "Zeta"])
+      await editProduct(products[name], { movement_class: "FAST" });
+    for (const name of ["Beta", "Omega"])
+      await editProduct(products[name], { movement_class: "SLOW" });
     const add = async (
       name: string,
       quantity: number,
@@ -170,7 +175,7 @@ test("inventory ordering and movement categories use approved OUT quantities", a
         const r = await query({ sort: "slow" });
         assert.deepEqual(names(r), ["Beta", "Omega"]);
         assert.equal(r.total, 2);
-        assert.equal(r.items[1].out_period, 0);
+        assert.equal(r.items[1].out_total, 0);
       },
     );
     await t.test("combined groups are fast A-Z then slow A-Z", async () =>
@@ -182,16 +187,6 @@ test("inventory ordering and movement categories use approved OUT quantities", a
         "Omega",
       ]),
     );
-    await t.test("threshold and window are configurable", async () => {
-      assert.deepEqual(
-        names(await query({ sort: "fast", fast_threshold: 20 })),
-        ["Gamma"],
-      );
-      assert.deepEqual(
-        names(await query({ sort: "fast", movement_days: 180 })),
-        ["Alpha", "Beta", "Gamma", "Zeta"],
-      );
-    });
     await t.test(
       "filters, pagination and CSV keep group ordering",
       async () => {
@@ -212,11 +207,79 @@ test("inventory ordering and movement categories use approved OUT quantities", a
         assert.deepEqual(names(all), ["Alpha", "Gamma", "Zeta"]);
         const content = await csv(
           all.items as unknown as Record<string, unknown>[],
-          ["name", "out_total", "out_period", "movement_class"],
+          ["name", "out_total", "movement_class"],
           "test",
         ).text();
         assert.ok(content.indexOf("Alpha") < content.indexOf("Gamma"));
         assert.ok(!content.includes("Beta"));
+      },
+    );
+    await t.test(
+      "labels are explicitly editable, zero OUT may be FAST, NULL is unlabelled",
+      async () => {
+        await execute(
+          "DELETE FROM stock_transactions WHERE product_id=? AND status='PENDING'",
+          [products.Omega],
+        );
+        await editProduct(products.Omega, { movement_class: "FAST" });
+        const zero = (await query({ sort: "fast" })).items.find(
+          (p) => p.name === "Omega",
+        );
+        assert.equal(zero?.out_total, 0);
+        assert.equal(zero?.movement_class, "FAST");
+        await editProduct(products.Alpha, { movement_class: null });
+        assert.deepEqual(names(await query({ sort: "unlabelled" })), ["Alpha"]);
+        assert.ok(!names(await query({ sort: "slow" })).includes("Alpha"));
+        assert.deepEqual(names(await query({ sort: "movement" })), [
+          "Gamma",
+          "Omega",
+          "Zeta",
+          "Beta",
+          "Alpha",
+        ]);
+      },
+    );
+    await t.test(
+      "adjacent capacity variants have distinct unique searchable item codes",
+      async () => {
+        const makeSlot = async (n: number) =>
+          (
+            await execute(
+              "INSERT INTO locations(rack_id,position_number,code,name) VALUES (?,?,?,?)",
+              [rackIds[1], n, `${code}.01.0${n}`, `Slot ${n}`],
+            )
+          ).insertId;
+        const slot3 = await makeSlot(3),
+          slot4 = await makeSlot(4);
+        await createProduct({
+          sku: "a0001",
+          name: "Ember 1 kg",
+          category_id: category!,
+          unit: "PCS",
+          location_id: slot3,
+          movement_class: "FAST",
+        });
+        await createProduct({
+          sku: "a0002",
+          name: "Ember 1,2 kg",
+          category_id: category!,
+          unit: "PCS",
+          location_id: slot4,
+          movement_class: "SLOW",
+        });
+        const r = await listProducts(productListSchema.parse({ q: "a0001" }));
+        assert.equal(r.total, 1);
+        assert.equal(r.items[0].name, "Ember 1 kg");
+        await assert.rejects(
+          createProduct({
+            sku: "A0001",
+            name: "Duplicate code",
+            category_id: category!,
+            unit: "PCS",
+            location_id: await makeSlot(5),
+          }),
+          { code: "ER_DUP_ENTRY" },
+        );
       },
     );
   } finally {

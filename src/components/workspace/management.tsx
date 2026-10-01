@@ -72,7 +72,7 @@ export function HistoryPage({
         <Input
           className="max-w-xs"
           aria-label="Cari histori"
-          placeholder="Cari transaksi, barang, SKU, rak…"
+          placeholder="Cari transaksi, barang, Kode Barang, rak…"
           value={q}
           onChange={(e) => reset(() => setQ(e.target.value))}
         />
@@ -134,7 +134,7 @@ export function HistoryPage({
           <option value="scanned_at">Waktu scan</option>
           <option value="approved_at">Waktu approve</option>
           <option value="quantity">Quantity</option>
-          <option value="sku">SKU</option>
+          <option value="sku">Kode Barang</option>
         </select>
         <select
           aria-label="Arah urutan"
@@ -164,7 +164,7 @@ export function HistoryPage({
                 {[
                   "Nomor Transaksi",
                   "Tanggal / Jam Scan",
-                  "SKU",
+                  "Kode Barang",
                   "Nama Barang",
                   "Lokasi",
                   "Ruangan",
@@ -407,7 +407,7 @@ export function AdjustmentsPage() {
         >
           <div>
             <label htmlFor="adjust-search">
-              Cari barang (nama / SKU / rak)
+              Cari barang (nama / Kode Barang / rak)
             </label>
             <Input
               id="adjust-search"

@@ -128,7 +128,7 @@ export function Shell({
             />
             <Input
               name="q"
-              placeholder="Cari nama barang, SKU, atau rak…"
+              placeholder="Cari nama barang, Kode Barang, atau rak…"
               className="pl-10 bg-slate-50 border-0"
             />
           </form>

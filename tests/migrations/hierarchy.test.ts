@@ -31,6 +31,14 @@ test("v1 migration preserves stock, QR, IDs and historical location snapshots", 
     await c.query(
       await readFile("migrations/002_location_hierarchy.sql", "utf8"),
     );
+    await c.query(
+      await readFile("migrations/003_manual_movement_label.sql", "utf8"),
+    );
+    const [labels] = await c.query<mysql.RowDataPacket[]>(
+      "SELECT sku,movement_class FROM products ORDER BY id",
+    );
+    assert.ok(labels.every((p) => p.movement_class === null));
+    assert.equal(labels[0].sku, "BRG-001");
     const [raw] = await c.query<mysql.RowDataPacket[]>(
       "SELECT p.stock,p.qr_token,l.id,l.code,l.legacy_code FROM products p JOIN locations l ON l.id=p.location_id WHERE p.id=1",
     );

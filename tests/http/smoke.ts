@@ -243,6 +243,42 @@ try {
   const csv = await request("products?export=csv");
   assert.match(csv.headers.get("content-type") || "", /text\/csv/);
   assert.ok((await csv.text()).includes(username));
+  assert.equal(
+    (
+      await request("products/" + product.id, "PATCH", {
+        movement_class: "FAST",
+      })
+    ).status,
+    200,
+  );
+  const fastList = await (
+    await request("products?sort=fast&q=" + username)
+  ).json();
+  assert.equal(fastList.data.total, 1);
+  assert.equal(fastList.data.items[0].out_total, 0);
+  const csvLabels = await (
+    await request("products?sort=fast&export=csv&q=" + username)
+  ).text();
+  assert.ok(csvLabels.includes("kode_barang"));
+  assert.ok(csvLabels.includes("FAST"));
+  assert.equal(
+    (
+      await request("products/" + product.id, "PATCH", {
+        movement_class: "SLOW",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await (await request("products?sort=fast&q=" + username)).json()).data
+      .total,
+    0,
+  );
+  assert.equal(
+    (await (await request("products?sort=slow&q=" + username)).json()).data
+      .total,
+    1,
+  );
   const dashboard = await request("dashboard");
   assert.equal(dashboard.status, 200);
   await request("auth/logout", "POST", {});

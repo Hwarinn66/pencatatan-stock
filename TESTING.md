@@ -43,6 +43,8 @@ Database pengujian adalah MariaDB Linux, bukan instalasi Laragon Windows Anda. S
 - Migrasi v1 → v2 diuji pada database sementara sungguhan, termasuk kode lama tidak standar, alias rak, stok/UUID/ID tetap, dan snapshot transaksi pending lama tidak ditulis ulang.
 - Form memilih ruangan/blok/rak/posisi, pengelolaan master, dan label cetak tetap memerlukan pemeriksaan visual di perangkat pengguna sesuai batas verifikasi di atas.
 
-## Verifikasi urutan barang dan movement
+## Verifikasi label manual dan kode barang
 
-`npm run test:reports` lulus pada MariaDB: 10 tests termasuk parent suite, mencakup nama default A–Z, stock descending, total OUT approved sepanjang histori, lokasi numerik (01/02/10/100), Fast A–Z, Slow A–Z termasuk 0 OUT, Fast lalu Slow A–Z, perubahan periode/ambang, pagination, filter dan CSV. Transaksi cancelled/pending/IN/adjustment serta approved timestamp di masa depan tidak ikut agregasi. Build produksi, TypeScript, 9 unit tests dan HTTP/SSE smoke test juga lulus pada revisi ini. UI browser dan perangkat fisik belum diverifikasi ulang.
+Revisi ini menghapus klasifikasi otomatis. Pengujian unit memeriksa FAST/SLOW/NULL tanpa nilai label default. Suite laporan MariaDB memeriksa penyimpanan/perubahan/penghapusan label melalui service, Fast dengan 0 OUT, Slow dengan total OUT tinggi, label yang tidak berubah berdasarkan quantity, grouping A–Z, pagination dan CSV. Dua barang berkapasitas mirip memakai kode a0001/a0002 pada posisi bersebelahan; kode duplikat ditolak dan pencarian kode menemukan varian yang tepat.
+
+Migrasi 003 diuji setelah migrasi 002 pada fixture v1: label lama NULL, kode/SKU, stok dan UUID tetap. HTTP smoke test mengubah label FAST→SLOW dan memeriksa filter serta header CSV `kode_barang`. Pemeriksaan visual dan kamera fisik tetap belum dilakukan ulang.

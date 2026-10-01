@@ -11,6 +11,7 @@ export const productSchema = z
     name: z.string().trim().min(1).max(160),
     category_id: idSchema,
     unit: z.string().trim().min(1).max(20),
+    movement_class: z.enum(["FAST", "SLOW"]).nullable().optional(),
     location_id: idSchema,
     description: z.string().max(5000).nullable().optional(),
     image: z
@@ -91,9 +92,8 @@ export const productListSchema = listSchema.extend({
       "fast",
       "slow",
       "movement",
+      "unlabelled",
     ])
     .default("name"),
   direction: z.enum(["asc", "desc"]).optional(),
-  movement_days: z.coerce.number().int().min(1).max(365).default(30),
-  fast_threshold: z.coerce.number().int().min(1).max(2147483647).default(10),
 });

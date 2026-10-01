@@ -53,6 +53,7 @@ CREATE TABLE locations (
 CREATE TABLE products (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, sku VARCHAR(64) NOT NULL UNIQUE,
  name VARCHAR(160) NOT NULL, category_id INT UNSIGNED NOT NULL, unit VARCHAR(20) NOT NULL,
+ movement_class ENUM('FAST','SLOW') NULL DEFAULT NULL,
  stock INT NOT NULL DEFAULT 0, location_id INT UNSIGNED NOT NULL,
  qr_token CHAR(36) NOT NULL UNIQUE, image MEDIUMTEXT, description TEXT,
  active BOOLEAN NOT NULL DEFAULT 1,
@@ -88,6 +89,7 @@ CREATE TABLE stock_transactions (
 ) ENGINE=InnoDB;
 CREATE INDEX idx_products_location ON products(location_id);
 CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_movement_name ON products(movement_class,name);
 CREATE INDEX idx_transactions_product ON stock_transactions(product_id);
 CREATE INDEX idx_transactions_status ON stock_transactions(status);
 CREATE INDEX idx_transactions_type ON stock_transactions(transaction_type);

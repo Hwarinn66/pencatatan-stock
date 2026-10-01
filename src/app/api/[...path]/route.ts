@@ -78,9 +78,12 @@ async function handler(req: Request, { params }: Context) {
           result = await listProducts(f);
         return f.export
           ? csv(
-              result.items as unknown as Record<string, unknown>[],
+              result.items.map((item) => ({
+                ...item,
+                kode_barang: item.sku,
+              })) as unknown as Record<string, unknown>[],
               [
-                "sku",
+                "kode_barang",
                 "name",
                 "category_name",
                 "stock",
@@ -89,12 +92,7 @@ async function handler(req: Request, { params }: Context) {
                 "room_name",
                 "active",
                 "out_total",
-                "out_period",
-                "out_per_day",
                 "movement_class",
-                "movement_days",
-                "fast_threshold",
-                "movement_as_of",
               ],
               "barang",
             )
@@ -150,13 +148,16 @@ async function handler(req: Request, { params }: Context) {
         result = await history(type, f);
       return f.export
         ? csv(
-            result.items as unknown as Record<string, unknown>[],
+            result.items.map((item) => ({
+              ...item,
+              kode_barang: item.sku,
+            })) as unknown as Record<string, unknown>[],
             [
               "transaction_number",
               "scanned_at",
               "approved_at",
               "cancelled_at",
-              "sku",
+              "kode_barang",
               "name",
               "location_code",
               "room_name",

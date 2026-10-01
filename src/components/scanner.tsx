@@ -271,10 +271,15 @@ export function Scanner() {
               <CheckCircle2 className="text-emerald-400 mb-3" />
               <h2 className="font-bold">QR BERHASIL DIBACA</h2>
               <p className="text-lg mt-3">{result.product.name}</p>
+              <p className="text-xs text-emerald-200 mt-3">KODE BARANG</p>
+              <p className="font-mono text-3xl font-bold tracking-wide">
+                {result.product.sku}
+              </p>
+              <p className="text-xs text-emerald-100 mt-2">
+                Cocokkan kode ini dengan label barang sebelum mengambil.
+              </p>
               <p className="text-xs text-emerald-100/70 mt-2">
                 Ruangan: {result.product.room_name}
-                <br />
-                SKU: {result.product.sku}
                 <br />
                 Lokasi: {result.product.location_code}
                 <br />

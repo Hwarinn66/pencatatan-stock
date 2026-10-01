@@ -79,21 +79,33 @@ test("location codes reset position per rack and preserve numbers above 99", () 
   assert.equal(locationCode("A", 100, 123), "A.100.123");
 });
 
-test("product sorting defaults and movement parameter limits", async () => {
-  const { productListSchema, listSchema } = await import("../src/validators");
-  const defaults = productListSchema.parse({});
-  assert.equal(defaults.sort, "name");
-  assert.equal(defaults.movement_days, 30);
-  assert.equal(defaults.fast_threshold, 10);
+test("manual movement labels validate without automatic defaults", async () => {
+  const { productListSchema, listSchema, productSchema, editProductSchema } =
+    await import("../src/validators");
+  assert.equal(productListSchema.parse({}).sort, "name");
   assert.equal(listSchema.parse({}).sort, "id");
-  for (const input of [
-    { sort: "name; DROP TABLE products" },
-    { movement_days: 0 },
-    { movement_days: 366 },
-    { movement_days: 1.5 },
-    { fast_threshold: 0 },
-    { fast_threshold: -1 },
-    { fast_threshold: 1.5 },
-  ])
-    assert.equal(productListSchema.safeParse(input).success, false);
+  assert.equal(
+    productListSchema.safeParse({ sort: "name; DROP TABLE products" }).success,
+    false,
+  );
+  const data = {
+    sku: "a0001",
+    name: "Ember 1 kg",
+    category_id: 1,
+    unit: "PCS",
+    location_id: 1,
+  };
+  assert.equal(productSchema.parse(data).movement_class, undefined);
+  assert.equal(
+    productSchema.parse({ ...data, movement_class: "FAST" }).movement_class,
+    "FAST",
+  );
+  assert.equal(
+    editProductSchema.parse({ movement_class: null }).movement_class,
+    null,
+  );
+  assert.equal(
+    editProductSchema.safeParse({ movement_class: "AUTO" }).success,
+    false,
+  );
 });

@@ -44,33 +44,45 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 
 Untuk instalasi baru, cukup import `database.sql` terbaru; **tidak perlu menjalankan migrasi**. Uji migrasi otomatis: `npm run test:migration` menggunakan database sementara acak dan memerlukan izin CREATE/DROP DATABASE pada server test. Script menolak konfigurasi DB_NAME yang tidak berakhiran `_test`.
 
-## Urutan barang dan Fast/Slow moving
+## Kode Barang dan label Fast/Slow manual
 
-Di **Barang**, pilih menu **Urutkan**:
+**Kode Barang** adalah identitas unik setiap varian, memakai kolom `products.sku` yang sudah ada. Tidak dibuat dua identitas yang saling bertentangan. Kode diisi saat Tambah Barang; kode barang lama tetap dipertahankan. Huruf kecil disimpan sesuai input; unique constraint MySQL tidak membedakan huruf besar/kecil sehingga `a0001` dan `A0001` tidak dapat menjadi dua barang berbeda. Kode tidak dapat diedit setelah barang dibuat.
 
-| Pilihan                                 | Hasil                                                                               |
-| --------------------------------------- | ----------------------------------------------------------------------------------- |
-| Nama A–Z (default)                      | Semua barang sesuai filter, alfabetis tanpa memisahkan fast/slow                    |
-| Stok terbanyak                          | Stok saat ini terbesar dahulu; nama A–Z jika sama                                   |
-| Total OUT terbanyak                     | Jumlah unit OUT APPROVED dari seluruh histori, terbesar dahulu                      |
-| Lokasi A.01.01 → terakhir               | Blok, nomor rak, lalu nomor posisi; angka 2 sebelum 10 dan 100                      |
-| Kelompok Fast → Slow, masing-masing A–Z | Kelompok Fast A–Z lebih dahulu, kemudian Slow A–Z, dengan pemisah kelompok di tabel |
-| Fast moving saja · A–Z                  | Hanya barang fast, nama alfabetis, bukan quantity terbesar                          |
-| Slow moving saja · A–Z                  | Hanya barang slow, nama alfabetis                                                   |
+| Kode Barang | Nama barang / kapasitas | Contoh posisi |
+| ----------- | ----------------------- | ------------- |
+| a0001       | Ember 1 kg              | A.01.01       |
+| a0002       | Ember 1,2 kg            | A.01.02       |
 
-Klasifikasi memakai **jumlah unit keluar dalam periode berjalan**, bukan stok tersisa atau jumlah scan. Nilai awal operasional: **30 hari terakhir**, fast jika **OUT ≥10 unit**, slow jika **OUT <10 unit**. Periode dapat dipilih (7/30/60/90/180/365 hari) dan ambang unit bisa diubah lewat tombol **Terapkan**. Ini parameter tampilan saat ini, bukan standar industri atau pengaturan global yang disimpan. Rata-rata OUT per hari = OUT periode / jumlah hari periode. Nilai ini tidak dinormalisasi menurut umur barang; barang baru dengan sedikit histori perlu dinilai dengan konteks itu.
+Isi kapasitas/ukuran pada nama barang. Kode ditampilkan sebagai kolom tersendiri di tabel, lebih besar pada label QR cetak, hasil scan HP dan transaksi pending. Cocokkan kode pada label posisi dan barang saat pengambilan, terutama untuk varian yang berdampingan. QR tetap token unik, bukan kode barang; pencarian mendukung kode dan nama. CSV produk/histori memakai header `kode_barang`; JSON API tetap memakai `sku` agar kompatibel.
 
-- Hanya `transaction_type='OUT'`, `status='APPROVED'`, dan waktu `approved_at` yang dihitung. Pending, cancelled, IN dan adjustment diabaikan.
-- Barang dengan OUT 0 dalam periode termasuk **Slow** dengan keterangan **Belum ada OUT dalam periode**. Total OUT sepanjang histori masih dapat lebih besar dari 0.
-- Batas periode bergulir dihitung dari waktu UTC database saat permintaan, misalnya 30 × 24 jam terakhir. Transaksi dengan tanggal approve di masa depan tidak dihitung.
-- Kolom tabel: Total OUT, OUT periode, rata-rata unit/hari, dan label Fast/Slow. Jumlah memakai satuan masing-masing barang; perbandingan PCS dengan unit lain perlu konteks.
-- Sorting, filter kategori/ruangan/posisi/stok/status, pagination dan CSV dikerjakan backend SQL. Fast/Slow dikelompokkan **sebelum pagination**. Export CSV mempertahankan filter/urutan dan mencantumkan periode, ambang serta waktu evaluasi UTC.
-- Tampilan default berisi barang aktif. Gunakan filter status **Semua status** jika juga ingin melihat barang nonaktif.
-- Tidak memerlukan migrasi SQL baru jika database sudah menggunakan v2 lokasi bertingkat.
+**Fast/Slow adalah label manual milik gudang**, dipilih pada Tambah/Edit Barang dan disimpan dalam MySQL (`movement_class`: `FAST`, `SLOW`, atau NULL). Tidak ada rumus, ambang, periode, atau klasifikasi berdasarkan OUT. Label tidak berubah saat scan, approve, cancel atau adjustment. Barang tanpa label tetap tampil sebagai **Belum diberi label**, tidak dianggap Slow secara otomatis.
 
-API produk menambah `sort=name|stock|out_total|location|movement|fast|slow|sku|id`, `movement_days=1..365`, `fast_threshold=1..2147483647`. Default produk adalah `name` A–Z. Urutan stock/out_total default descending; `fast`, `slow`, `movement` selalu A–Z di dalam kelompok meskipun client mengirim direction lain. Histori tetap default transaksi terbaru dahulu. Contoh: `/api/products?sort=fast&movement_days=30&fast_threshold=10`.
+Pilihan **Barang → Urutkan**:
 
-Uji database khusus fitur ini: **`npm run test:reports`**, memakai `.env.test` dan database disposable berakhiran `_test`. Suite membuat dan membersihkan fixture sendiri.
+| Pilihan                                 | Hasil                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| Nama A–Z (default)                      | Semua barang sesuai filter, alfabetis tanpa memisahkan label                         |
+| Stok terbanyak                          | Stok saat ini terbesar dahulu, nama A–Z untuk nilai sama                             |
+| Total OUT terbanyak                     | Jumlah unit OUT APPROVED sepanjang histori, terbesar dahulu; tidak memengaruhi label |
+| Lokasi A.01.01 → terakhir               | Blok, nomor rak, lalu posisi secara numerik                                          |
+| Kelompok Fast → Slow, masing-masing A–Z | Fast A–Z, Slow A–Z, lalu Belum diberi label A–Z                                      |
+| Fast moving saja · A–Z                  | Hanya label manual Fast                                                              |
+| Slow moving saja · A–Z                  | Hanya label manual Slow                                                              |
+| Belum diberi label · A–Z                | Barang yang belum diklasifikasikan oleh user                                         |
+| Kode Barang A–Z                         | Urut identitas kode barang                                                           |
+
+Pengelompokan dilakukan backend SQL sebelum pagination. CSV mengikuti filter dan urutan, mencantumkan kode barang, total OUT dan label manual. Perbandingan total unit OUT perlu memperhatikan satuan masing-masing barang. Hanya OUT APPROVED dengan waktu approve tidak di masa depan yang dihitung untuk total tersebut.
+
+### Upgrade label manual
+
+- **Database lama versi v2:** backup dan hentikan aplikasi, pilih database `warehouse_stock`, lalu jalankan **`migrations/003_manual_movement_label.sql` sekali**. Ini menambah kolom label kosong dan index. Stok, kode barang, QR dan histori tidak diubah.
+- Bila belum memasang hierarki lokasi, jalankan migrasi **002 lalu 003** berurutan. Jangan menjalankan ulang migrasi yang sudah diterapkan.
+- **Instalasi baru:** import `database.sql` terbaru saja, tanpa menjalankan migrasi tambahan.
+- Setelah upgrade, buka Barang → Edit → **Label pergerakan (manual)** untuk mengisi label Fast/Slow yang sudah Anda miliki. Selesaikan pending dahulu bila barang terkunci.
+
+API POST/PATCH produk menerima `movement_class:"FAST"`, `"SLOW"`, atau `null` (hapus label). Omit field saat PATCH untuk mempertahankan label. Kode barang tetap memakai `sku`. GET produk: `sort=name|stock|out_total|location|movement|fast|slow|unlabelled|sku|id`. Parameter periode dan ambang versi sebelumnya sudah tidak digunakan. Histori tetap default transaksi terbaru dahulu.
+
+Pengujian `npm run test:reports` memastikan label manual terpisah dari OUT, termasuk Fast tanpa OUT, Slow dengan OUT tinggi, hapus label, urutan A–Z, CSV, serta kode unik varian kapasitas berdampingan.
 
 ## Persyaratan
 
@@ -172,12 +184,12 @@ Lihat [Next.js CLI — HTTPS](https://nextjs.org/docs/app/api-reference/cli/next
 
 ## Penggunaan
 
-- **Tambah Barang**: SKU unik, nama, kategori, satuan dan posisi barang wajib. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
+- **Tambah Barang**: Kode Barang unik, nama, kategori, satuan dan posisi barang wajib. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
 - **QR Barang**: download SVG, Print QR dengan nama/SKU/lokasi lengkap dan ruangan. QR hanya memuat UUID, bukan SKU atau nomor rak. Regenerate membatalkan token lama; cetak dan ganti label setelahnya.
 - **Scanner HP**: mode IN/OUT → scan → tampilkan hasil backend. Kamera berhenti sementara setelah pembacaan; tombol **Scan berikutnya** mengaktifkan lagi. Ini menghindari spam kamera, sementara aturan anti-double scan yang sebenarnya berada di database, tanpa cooldown waktu.
 - **Transaksi Pending**: isi bilangan bulat positif, lihat preview, Approve atau Batalkan. Quantity dapat juga disimpan lewat endpoint PATCH. UI approve mengirim quantity secara atomik sehingga tidak ada ketergantungan penyimpanan draft.
 - **Adjustment**: pilih barang, masukkan stok fisik nonnegatif, alasan dan konfirmasi approve. Backend memeriksa stok yang dilihat user masih sama; jika berubah, pilih ulang barang. Quantity histori adjustment adalah selisih, dapat negatif.
-- **Edit/rak**: stok dan SKU tidak dapat diedit. Perpindahan rak membutuhkan konfirmasi; posisi baru harus kosong (rak yang sama boleh menampung barang lain). Histori menyimpan ID dan kode rak saat transaksi, tidak berubah saat master rak diedit.
+- **Edit/rak**: stok dan Kode Barang tidak dapat diedit. Perpindahan rak membutuhkan konfirmasi; posisi baru harus kosong (rak yang sama boleh menampung barang lain). Histori menyimpan ID dan kode rak saat transaksi, tidak berubah saat master rak diedit.
 - **Nonaktifkan**: record barang dipertahankan. QR nonaktif ditolak. Tidak dapat mengubah barang/rak/QR/adjustment saat ada pending; selesaikan dahulu.
 - **Histori**: semua status tersedia, filter tanggal berdasarkan `scanned_at` di timezone aplikasi. IN/OUT hari ini pada dashboard dihitung berdasarkan `approved_at`, hanya APPROVED. CSV mengekspor seluruh hasil filter, bukan hanya halaman saat ini. Waktu CSV adalah UTC dari database. Formula berbahaya pada CSV dinetralkan.
 - **Stock menipis**: halaman daftar mencakup `<=2`, termasuk 0. Card dashboard memisahkan stok 1–2 dan stok 0. Total Stock menjumlahkan unit lintas barang; periksa satuan masing-masing saat menafsirkan total.
