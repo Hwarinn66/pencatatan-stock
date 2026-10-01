@@ -6,3 +6,5 @@ export {
   LookupsPage,
   SettingsPage,
 } from "./management";
+
+export { LocationManager } from "./locations";

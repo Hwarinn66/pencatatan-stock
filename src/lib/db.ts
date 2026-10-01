@@ -20,9 +20,10 @@ export const db =
     decimalNumbers: true,
     multipleStatements: false,
   });
-if (!globalDb.warehousePool) db.pool.on("connection", (connection) => {
-  connection.query("SET time_zone = '+00:00'");
-});
+if (!globalDb.warehousePool)
+  db.pool.on("connection", (connection) => {
+    connection.query("SET time_zone = '+00:00'");
+  });
 if (process.env.NODE_ENV !== "production") globalDb.warehousePool = db;
 export type Connection = Pool | PoolConnection;
 export async function rows<T = Record<string, unknown>>(

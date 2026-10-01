@@ -45,7 +45,9 @@ export async function GET(req: Request) {
             if (revision !== last || retrying) {
               last = revision;
               retrying = false;
-              send(`id: ${revision}\nevent: update\ndata: {"version":${result.version},"count":${result.count}}\n\n`);
+              send(
+                `id: ${revision}\nevent: update\ndata: {"version":${result.version},"count":${result.count}}\n\n`,
+              );
             }
             if (++heartbeat % 15 === 0) send(": heartbeat\n\n");
           } catch {

@@ -1,3 +1,4 @@
+import { listLocations, mutateLocation } from "@/services/locations";
 import { z } from "zod";
 import QRCode from "qrcode";
 import { ok, errorResponse, AppError } from "@/lib/errors";
@@ -83,6 +84,7 @@ async function handler(req: Request, { params }: Context) {
                 "stock",
                 "unit",
                 "location_code",
+                "room_name",
                 "active",
               ],
               "barang",
@@ -148,6 +150,7 @@ async function handler(req: Request, { params }: Context) {
               "sku",
               "name",
               "location_code",
+              "room_name",
               "quantity",
               "stock_before",
               "stock_after",
@@ -174,27 +177,32 @@ async function handler(req: Request, { params }: Context) {
         app_url: process.env.APP_URL,
         cookie_secure: process.env.COOKIE_SECURE === "true",
       });
-    if (resource === "categories" || resource === "locations") {
+    const masters = {
+      rooms: schemas.roomSchema,
+      blocks: schemas.blockSchema,
+      racks: schemas.rackSchema,
+      locations: schemas.locationSchema,
+      categories: schemas.categorySchema,
+    };
+    if (Object.hasOwn(masters, resource)) {
+      const kind = resource as keyof typeof masters;
       if (method === "GET" && !key)
         return ok(
-          await rows(
-            resource === "categories"
-              ? "SELECT * FROM categories ORDER BY name"
-              : "SELECT * FROM locations ORDER BY code",
-          ),
+          kind === "categories"
+            ? await rows("SELECT * FROM categories ORDER BY name")
+            : await listLocations(kind),
         );
       if (["POST", "PATCH", "DELETE"].includes(method)) {
         const id = key ? schemas.idSchema.parse(key) : undefined;
-        if (method !== "POST" && !id)
-          throw new AppError("INVALID_ID", "ID wajib diisi.");
+        if ((method === "POST" && id) || (method !== "POST" && !id))
+          throw new AppError("INVALID_ID", "URL master data tidak sesuai.");
         const input =
-          method === "DELETE"
-            ? {}
-            : (resource === "categories"
-                ? schemas.categorySchema
-                : schemas.locationSchema
-              ).parse(await body());
-        return ok(await mutateLookup(resource, method, id, input));
+          method === "DELETE" ? {} : masters[kind].parse(await body());
+        return ok(
+          kind === "categories"
+            ? await mutateLookup(kind, method, id, input)
+            : await mutateLocation(kind, method, id, input),
+        );
       }
     }
     throw new AppError("NOT_FOUND", "Endpoint tidak ditemukan.", 404);

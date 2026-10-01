@@ -6,7 +6,43 @@ Aplikasi Next.js + TypeScript untuk gudang lokal Windows. Database **MySQL/Maria
 
 Tambah barang → stok awal 0 + UUID QR otomatis → cetak label → HP login `/scanner` → pilih IN/OUT → scan → transaksi PENDING (stok belum berubah) → komputer menerima SSE → isi quantity → approve → SQL transaction memperbarui stok dan histori → QR dapat dipakai lagi. Cancel mempertahankan histori dan tidak mengubah stok.
 
-Fitur: dashboard 8 indikator, master barang/kategori/rak, foto opsional tersimpan di MySQL, detail dan histori barang, regenerasi QR, label cetak, antrean multi-barang, adjustment stock opname dengan alasan, filter/search/sorting/pagination, CSV, soft disable barang, login server session, feedback suara/vibrasi HP. Semua data operasional berasal dari MySQL; browser tidak mengakses database.
+Fitur: dashboard 8 indikator, master barang/kategori/ruangan/blok/rak/posisi, foto opsional tersimpan di MySQL, detail dan histori barang, regenerasi QR, label cetak, antrean multi-barang, adjustment stock opname dengan alasan, filter/search/sorting/pagination, CSV, soft disable barang, login server session, feedback suara/vibrasi HP. Semua data operasional berasal dari MySQL; browser tidak mengakses database.
+
+## Lokasi bertingkat (v2)
+
+Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
+
+| Ruangan   | Blok | Nomor rak | Nomor posisi | Lokasi barang |
+| --------- | ---- | --------: | -----------: | ------------- |
+| Ruangan 1 | A    |         1 |            1 | A.01.01       |
+| Ruangan 1 | A    |         1 |            2 | A.01.02       |
+| Ruangan 1 | A    |         2 |            1 | A.02.01       |
+| Ruangan 1 | A    |         2 |            2 | A.02.02       |
+
+- Satu rak boleh berisi beberapa barang di **posisi berbeda**. Satu posisi hanya boleh dipakai satu barang aktif.
+- Nomor posisi unik **per rak**, sehingga posisi 1 pada rak A.01 dan A.02 diperbolehkan. Nomor rak unik per blok. Nomor ditampilkan minimal dua digit, tanpa memotong angka di atas 99.
+- **Kode blok unik di seluruh gudang**, misalnya A di Ruangan 1 dan B di Ruangan 2. Ini membuat A.01.01 tidak ambigu tanpa awalan ruangan. Nama ruangan tetap ditampilkan di detail, label QR, scanner, antrean dan histori baru.
+- Buka **Lokasi Gudang** → buat Ruangan → Blok → Rak → Posisi Barang. UI menyarankan nomor berikutnya pada induk yang dipilih; untuk rak baru posisi dimulai dari 1. Angka boleh disesuaikan.
+- Tambah/Edit Barang memakai empat pilihan bertingkat. Posisi terisi ditandai dan tidak dapat dipilih untuk barang lain. Backend dan UNIQUE constraint tetap menjadi pengaman akhir terhadap dua request bersamaan.
+- UUID QR tetap **per barang**, bukan per rak; tempel label pada **posisi barang** masing-masing. IN/OUT, anti-double-scan dan approval tidak berubah.
+- Identitas blok/rak yang sudah berisi anak dan identitas posisi yang sudah dipakai tidak dapat diganti. Buat lokasi tujuan dan pindahkan barang lewat Edit Barang. Nama/keterangan tetap dapat diedit. Histori menyimpan kode lokasi dan nama ruangan saat transaksi.
+- API `/api/locations` kini berarti **posisi**. POST/PATCH menerima `{rack_id,position_number,name,description?,active?}`; `code` dirangkai server, jangan diketik manual.
+- Master baru: GET/POST `/api/rooms` (`name`), `/api/blocks` (`room_id,code,name`), `/api/racks` (`block_id,rack_number,name`), serta PATCH/DELETE `/:id` masing-masing. Semua memerlukan session dan validasi.
+- `products.location_id` tetap menunjuk ID posisi. Tabel `locations` tidak dihapus sehingga foreign key produk/histori tetap stabil. Filter barang mendukung `room_id`, `block_id`, `rack_id`, dan `location_id`.
+
+### Upgrade database yang sudah dipakai (v1 → v2)
+
+**Jangan import ulang `database.sql` ke database lama.** Gunakan migrasi berikut sekali:
+
+1. Backup database melalui HeidiSQL/phpMyAdmin. Hentikan aplikasi selama migrasi.
+2. Pilih database **warehouse_stock** yang sudah ada, lalu jalankan seluruh file **`migrations/002_location_hierarchy.sql`** dalam satu sesi.
+3. Lokasi lama seperti `A-01` dipetakan ke Ruangan 1 / Blok A / Rak 01 / Posisi 01 → **A.01.01**. Jika ada alias `A.01` dan `A-01`, keduanya menjadi posisi berbeda dalam rak yang sama berdasarkan ID lama.
+4. Kode lama yang tidak berpola huruf + nomor ditempatkan pada Blok **LEGACY**, nomor rak mengikuti ID lokasi lama. Kolom `legacy_code` menyimpan kode asli dan ditampilkan di menu lokasi untuk pemeriksaan.
+5. ID lokasi, stok barang, UUID QR dan histori transaksi lama **dipertahankan**. Histori lama tetap menampilkan kode lama; ruangan historis yang belum pernah dicatat ditampilkan kosong. Pending lama tetap dapat diapprove/cancel.
+6. Ruangan 1 adalah asumsi migrasi karena versi lama tidak menyimpan ruangan. Periksa pemetaan fisik; buat lokasi tujuan yang benar dan pindahkan barang bila perlu. Cetak ulang label agar teks lokasi baru sesuai. QR yang sama tetap berlaku.
+7. Jalankan source baru. DDL MySQL melakukan implicit commit; bila migrasi terhenti, **restore backup** sebelum mengulang. File migrasi bukan script idempotent.
+
+Untuk instalasi baru, cukup import `database.sql` terbaru; **tidak perlu menjalankan migrasi**. Uji migrasi otomatis: `npm run test:migration` menggunakan database sementara acak dan memerlukan izin CREATE/DROP DATABASE pada server test. Script menolak konfigurasi DB_NAME yang tidak berakhiran `_test`.
 
 ## Persyaratan
 
@@ -53,13 +89,13 @@ Restart server setelah mengubah `.env.local`. Jangan commit `.env.local`, `.env.
 
 ## Seed data
 
-| SKU     | Barang                 | Rak  | Stock | Status  |
-| ------- | ---------------------- | ---- | ----: | ------- |
-| BRG-001 | Mouse Logitech M331    | A-01 |    25 | Aman    |
-| BRG-002 | Keyboard Logitech K120 | A-02 |     2 | Menipis |
-| BRG-003 | HDMI Cable 2 Meter     | B-01 |     0 | Habis   |
+| SKU     | Barang                 | Lokasi  | Stock | Status  |
+| ------- | ---------------------- | ------- | ----: | ------- |
+| BRG-001 | Mouse Logitech M331    | A.01.01 |    25 | Aman    |
+| BRG-002 | Keyboard Logitech K120 | A.02.01 |     2 | Menipis |
+| BRG-003 | HDMI Cable 2 Meter     | B.01.01 |     0 | Habis   |
 
-Kategori: Elektronik, Kabel, ATK, Sparepart. Rak kosong: A-03 dan A-05. Stok seed adalah saldo awal contoh; tidak dihitung sebagai IN hari ini. Untuk uji tambah barang, gunakan SKU baru (mis. BRG-004) dan rak kosong karena BRG-001/A-01 sudah dipakai seed.
+Kategori: Elektronik, Kabel, ATK, Sparepart. Posisi kosong: A.03.01 dan A.05.01. Stok seed adalah saldo awal contoh; tidak dihitung sebagai IN hari ini. Untuk uji tambah barang, gunakan SKU baru (mis. BRG-004) dan posisi kosong karena BRG-001/A.01.01 sudah dipakai seed.
 
 ## Akses dari smartphone
 
@@ -108,12 +144,12 @@ Lihat [Next.js CLI — HTTPS](https://nextjs.org/docs/app/api-reference/cli/next
 
 ## Penggunaan
 
-- **Tambah Barang**: SKU unik, nama, kategori, satuan dan rak wajib. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
-- **QR Barang**: download SVG, Print QR dengan nama/SKU/rak. QR hanya memuat UUID, bukan SKU atau nomor rak. Regenerate membatalkan token lama; cetak dan ganti label setelahnya.
+- **Tambah Barang**: SKU unik, nama, kategori, satuan dan posisi barang wajib. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
+- **QR Barang**: download SVG, Print QR dengan nama/SKU/lokasi lengkap dan ruangan. QR hanya memuat UUID, bukan SKU atau nomor rak. Regenerate membatalkan token lama; cetak dan ganti label setelahnya.
 - **Scanner HP**: mode IN/OUT → scan → tampilkan hasil backend. Kamera berhenti sementara setelah pembacaan; tombol **Scan berikutnya** mengaktifkan lagi. Ini menghindari spam kamera, sementara aturan anti-double scan yang sebenarnya berada di database, tanpa cooldown waktu.
 - **Transaksi Pending**: isi bilangan bulat positif, lihat preview, Approve atau Batalkan. Quantity dapat juga disimpan lewat endpoint PATCH. UI approve mengirim quantity secara atomik sehingga tidak ada ketergantungan penyimpanan draft.
 - **Adjustment**: pilih barang, masukkan stok fisik nonnegatif, alasan dan konfirmasi approve. Backend memeriksa stok yang dilihat user masih sama; jika berubah, pilih ulang barang. Quantity histori adjustment adalah selisih, dapat negatif.
-- **Edit/rak**: stok dan SKU tidak dapat diedit. Perpindahan rak membutuhkan konfirmasi; rak baru harus kosong. Histori menyimpan ID dan kode rak saat transaksi, tidak berubah saat master rak diedit.
+- **Edit/rak**: stok dan SKU tidak dapat diedit. Perpindahan rak membutuhkan konfirmasi; posisi baru harus kosong (rak yang sama boleh menampung barang lain). Histori menyimpan ID dan kode rak saat transaksi, tidak berubah saat master rak diedit.
 - **Nonaktifkan**: record barang dipertahankan. QR nonaktif ditolak. Tidak dapat mengubah barang/rak/QR/adjustment saat ada pending; selesaikan dahulu.
 - **Histori**: semua status tersedia, filter tanggal berdasarkan `scanned_at` di timezone aplikasi. IN/OUT hari ini pada dashboard dihitung berdasarkan `approved_at`, hanya APPROVED. CSV mengekspor seluruh hasil filter, bukan hanya halaman saat ini. Waktu CSV adalah UTC dari database. Formula berbahaya pada CSV dinetralkan.
 - **Stock menipis**: halaman daftar mencakup `<=2`, termasuk 0. Card dashboard memisahkan stok 1–2 dan stok 0. Total Stock menjumlahkan unit lintas barang; periksa satuan masing-masing saat menafsirkan total.
@@ -122,7 +158,7 @@ Lihat [Next.js CLI — HTTPS](https://nextjs.org/docs/app/api-reference/cli/next
 
 - Semua SQL melalui backend, menggunakan parameter `?` dan connection pool terpusat di `src/lib/db.ts`.
 - Scan melakukan SQL transaction: lock product `FOR UPDATE`, validasi aktif/token/stock OUT, cari pending dengan lock, lalu insert pending + event outbox. Token diverifikasi lagi setelah lock, sehingga regenerasi bersamaan tidak mengaktifkan token lama.
-- Generated column `pending_product_id` + UNIQUE adalah perlindungan tambahan satu pending per barang. `active_location_id` + UNIQUE menjamin satu barang aktif per rak.
+- Generated column `pending_product_id` + UNIQUE adalah perlindungan tambahan satu pending per barang. `active_location_id` + UNIQUE menjamin satu barang aktif per posisi.
 - Approve/cancel/quantity selalu lock **product dulu, transaction kemudian**. Validasi status terminal, quantity, overflow dan stock terbaru. Stok tidak boleh negatif. Semua query satu transaksi menggunakan **connection mysql2 yang sama**. Gagal di mana pun → rollback.
 - Nomor transaksi: counter harian per IN/OUT/ADJ, dibuat dalam transaction dengan upsert yang terkunci, ditambah unique constraint. Format `IN-YYYYMMDD-0001` (angka melebar bila >9999).
 - SSE membaca `stock_events` outbox di MySQL tiap 1 detik. Revisi memakai MAX(id) dan COUNT(*) agar commit yang selesai tidak berurutan tetap terdeteksi. Event ditulis dalam transaction yang sama; tidak ada event untuk perubahan yang rollback. Mendukung beberapa proses Node karena tidak bergantung pada EventEmitter memory. Klien reconnect dan fallback polling 5 detik bila SSE gagal. Ini bukan binlog streaming; latensi normal sekitar 1 detik plus jaringan.
@@ -199,13 +235,13 @@ Test akan **menghapus data dalam database test**, sehingga sengaja menolak DB_NA
 3. Copy `.env.example` menjadi `.env.test`; isi credential database dan `DB_NAME=warehouse_stock_test`.
 4. Jalankan `npm run test:integration`.
 
-Suite menguji create/QR/stock 0, IN/OUT, concurrent scan antar-mode, cancel/unlock, quantity melebihi stock, low stock, duplicate rack, simultaneous approvals, adjustment/stale stock, perpindahan rak, token lama dan barang nonaktif. Rollback diuji dengan **trigger test yang sengaja menggagalkan INSERT outbox setelah UPDATE stock**; pastikan user DB test mempunyai izin CREATE/DROP TRIGGER.
+Suite menguji create/QR/stock 0, IN/OUT, concurrent scan antar-mode, cancel/unlock, quantity melebihi stock, low stock, duplicate position, simultaneous approvals, adjustment/stale stock, perpindahan rak, token lama dan barang nonaktif. Rollback diuji dengan **trigger test yang sengaja menggagalkan INSERT outbox setelah UPDATE stock**; pastikan user DB test mempunyai izin CREATE/DROP TRIGGER.
 
 ### Checklist penerimaan perangkat (wajib dilakukan di LAN Anda)
 
 | Test | Langkah                                       | Hasil yang diharapkan                        |
 | ---- | --------------------------------------------- | -------------------------------------------- |
-| 1    | Buat BRG-004 pada A-03                        | Stock 0, QR dapat diunduh/cetak              |
+| 1    | Buat BRG-004 pada A.03.01                     | Stock 0, QR dapat diunduh/cetak              |
 | 2    | HP IN → scan → komputer qty 10 → approve      | Pending sebelum approve; stock 10 sesudahnya |
 | 3    | HP OUT → qty 5 → approve                      | Stock turun menjadi 5                        |
 | 4    | Scan barang sama dua kali, termasuk beda mode | Scan kedua ditolak dengan nomor pending      |
@@ -214,7 +250,7 @@ Suite menguji create/QR/stock 0, IN/OUT, concurrent scan antar-mode, cancel/unlo
 | 7    | Scan OUT HDMI seed stock 0                    | STOK HABIS, tidak ada pending baru           |
 | 8    | Stock 5, OUT 3                                | Stock 2, label merah                         |
 | 9    | Buka komputer dan HP bersamaan; scan HP       | Pending muncul tanpa refresh (~1 detik)      |
-| 10   | Buat barang baru di A-01 yang terpakai        | Pesan rak sudah digunakan                    |
+| 10   | Buat barang baru di A.01.01 yang terpakai     | Pesan posisi sudah digunakan                 |
 | 11   | Jalankan integration rollback trigger         | Stock dan transaction sama-sama rollback     |
 
 Periksa juga izin kamera ditolak, HTTPS trust, kamera belakang, beep setelah gesture memilih mode, vibrasi (opsional, tidak tersedia pada semua browser), print label fisik, login/logout, dan reconnect Wi-Fi. Automasi server tidak membuktikan kompatibilitas kamera/sertifikat pada HP tertentu.

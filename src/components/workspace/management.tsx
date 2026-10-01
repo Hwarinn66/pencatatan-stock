@@ -109,7 +109,7 @@ export function HistoryPage({
           value={rack}
           onChange={(e) => reset(() => setRack(e.target.value))}
         >
-          <option value="">Semua rak</option>
+          <option value="">Semua posisi</option>
           {locations.data?.map((l) => (
             <option key={l.id} value={l.id}>
               {l.code}
@@ -166,7 +166,8 @@ export function HistoryPage({
                   "Tanggal / Jam Scan",
                   "SKU",
                   "Nama Barang",
-                  "Rak",
+                  "Lokasi",
+                  "Ruangan",
                   "Qty",
                   "Sebelum",
                   "Sesudah",
@@ -187,6 +188,7 @@ export function HistoryPage({
                   <td>{t.sku}</td>
                   <td>{t.name}</td>
                   <td>{t.location_code}</td>
+                  <td>{t.room_name || "— (histori lama)"}</td>
                   <td className="font-bold">{t.quantity ?? "—"}</td>
                   <td>{t.stock_before ?? "—"}</td>
                   <td>{t.stock_after ?? "—"}</td>
@@ -210,33 +212,27 @@ export function HistoryPage({
     </section>
   );
 }
-export function LookupsPage({ kind }: { kind: "categories" | "locations" }) {
+export function LookupsPage({ kind }: { kind: "categories" }) {
   const list = useData<Lookup[]>(kind);
-  const [editing, setEditing] = useState<Lookup | null>(null);
-  const [formKey, setFormKey] = useState(0);
+  const [editing, setEditing] = useState<Lookup>();
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const isRack = kind === "locations";
-  const filtered =
-    list.data?.filter((x) =>
-      (x.name + " " + (x.code || "")).toLowerCase().includes(q.toLowerCase()),
-    ) || [];
+  const filtered = (list.data || []).filter((c) =>
+    c.name.toLowerCase().includes(q.toLowerCase()),
+  );
   return (
     <>
       <Heading
-        title={isRack ? "Lokasi rak" : "Kategori"}
-        description={
-          isRack
-            ? "Satu rak hanya dapat dipakai oleh satu barang aktif."
-            : "Kelompokkan barang untuk memudahkan pencarian."
-        }
+        title="Kategori"
+        description="Kelompokkan barang untuk memudahkan pencarian."
       />
       <div className="grid lg:grid-cols-[1fr_340px] gap-6">
         <div>
           <Input
-            placeholder="Cari…"
-            aria-label="Cari master data"
+            aria-label="Cari kategori"
+            placeholder="Cari kategori…"
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -246,56 +242,43 @@ export function LookupsPage({ kind }: { kind: "categories" | "locations" }) {
           />
           <State
             error={list.error}
-            loading={list.loading && !list.data}
+            loading={!list.data && list.loading}
             empty={!!list.data && !filtered.length}
           />
           {!!filtered.length && (
-            <Card className="p-0 overflow-x-auto">
+            <Card className="p-0 overflow-auto">
               <table className="w-full">
                 <thead>
                   <tr>
-                    {isRack && <th>Kode</th>}
                     <th>Nama</th>
-                    {isRack && <th>Status</th>}
-                    <th>Action</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.slice((page - 1) * 20, page * 20).map((x) => (
-                    <tr key={x.id}>
-                      {isRack && <td className="font-semibold">{x.code}</td>}
-                      <td>{x.name}</td>
-                      {isRack && (
-                        <td className="text-xs">
-                          {x.active ? "Aktif" : "Nonaktif"}
-                        </td>
-                      )}
+                  {filtered.slice((page - 1) * 20, page * 20).map((c) => (
+                    <tr key={c.id}>
+                      <td>{c.name}</td>
                       <td>
                         <div className="flex gap-3 text-xs">
                           <button
                             className="text-emerald-700"
                             onClick={() => {
-                              setEditing(x);
-                              setFormKey((k) => k + 1);
+                              setEditing(c);
+                              setName(c.name);
                             }}
                           >
                             Edit
                           </button>
                           <button
-                            className="text-red-600"
+                            className="text-red-700"
                             disabled={busy}
                             onClick={async () => {
-                              if (
-                                !confirm(
-                                  `Hapus ${x.name}? Data yang masih digunakan tidak dapat dihapus.`,
-                                )
-                              )
-                                return;
+                              if (!confirm(`Hapus kategori ${c.name}?`)) return;
                               setBusy(true);
                               try {
-                                await write(kind + "/" + x.id, {}, "DELETE");
-                                toast.success("Data dihapus");
-                                void list.reload();
+                                await write("categories/" + c.id, {}, "DELETE");
+                                await list.reload();
+                                toast.success("Kategori dihapus");
                               } catch (e) {
                                 toast.error((e as Error).message);
                               } finally {
@@ -316,33 +299,23 @@ export function LookupsPage({ kind }: { kind: "categories" | "locations" }) {
           <Pager page={page} total={filtered.length} onPage={setPage} />
         </div>
         <Card className="h-fit">
-          <h2 className="font-bold mb-5">
-            {editing ? "Edit" : "Tambah"} {isRack ? "rak" : "kategori"}
+          <h2 className="font-bold mb-4">
+            {editing ? "Edit" : "Tambah"} kategori
           </h2>
           <form
-            key={formKey}
             onSubmit={async (e) => {
               e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              const input = isRack
-                ? {
-                    code: f.get("code"),
-                    name: f.get("name"),
-                    description: f.get("description"),
-                    active: f.get("active") === "on",
-                  }
-                : { name: f.get("name") };
               setBusy(true);
               try {
                 await write(
-                  kind + (editing ? "/" + editing.id : ""),
-                  input,
+                  "categories" + (editing ? "/" + editing.id : ""),
+                  { name },
                   editing ? "PATCH" : "POST",
                 );
-                setEditing(null);
-                setFormKey((k) => k + 1);
                 await list.reload();
-                toast.success("Data disimpan");
+                setEditing(undefined);
+                setName("");
+                toast.success("Kategori disimpan");
               } catch (e) {
                 toast.error((e as Error).message);
               } finally {
@@ -350,59 +323,24 @@ export function LookupsPage({ kind }: { kind: "categories" | "locations" }) {
               }
             }}
           >
-            {isRack && (
-              <div className="mb-4">
-                <label htmlFor="code">Kode Rak</label>
-                <Input
-                  id="code"
-                  name="code"
-                  required
-                  maxLength={50}
-                  defaultValue={editing?.code}
-                />
-              </div>
-            )}
-            <label htmlFor="lookup-name">Nama</label>
+            <label htmlFor="category-name">Nama kategori</label>
             <Input
-              id="lookup-name"
-              name="name"
+              id="category-name"
               required
               maxLength={100}
-              defaultValue={editing?.name}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="mb-4"
             />
-            {isRack && (
-              <>
-                <label htmlFor="lookup-description">Deskripsi</label>
-                <textarea
-                  id="lookup-description"
-                  name="description"
-                  maxLength={2000}
-                  defaultValue={editing?.description || ""}
-                  className="w-full mb-4"
-                />
-                <label className="flex gap-2 items-center mb-4">
-                  <input
-                    type="checkbox"
-                    name="active"
-                    defaultChecked={editing ? !!editing.active : true}
-                  />
-                  Aktif
-                </label>
-              </>
-            )}
             <div className="flex gap-2">
-              <Button disabled={busy}>
-                <Plus />
-                {busy ? "Menyimpan…" : "Simpan"}
-              </Button>
+              <Button disabled={busy}>Simpan</Button>
               {editing && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setEditing(null);
-                    setFormKey((k) => k + 1);
+                    setEditing(undefined);
+                    setName("");
                   }}
                 >
                   Batal

@@ -272,9 +272,11 @@ export function Scanner() {
               <h2 className="font-bold">QR BERHASIL DIBACA</h2>
               <p className="text-lg mt-3">{result.product.name}</p>
               <p className="text-xs text-emerald-100/70 mt-2">
+                Ruangan: {result.product.room_name}
+                <br />
                 SKU: {result.product.sku}
                 <br />
-                Rak: {result.product.location_code}
+                Lokasi: {result.product.location_code}
                 <br />
                 Stok: {result.product.stock} {result.product.unit}
                 <br />

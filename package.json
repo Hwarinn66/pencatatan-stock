@@ -11,7 +11,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:integration": "node --env-file=.env.test --import tsx --test tests/integration/*.test.ts",
     "user:create": "node --env-file=.env.local --import tsx scripts/create-user.ts",
-    "test:http": "node --env-file=.env.test --import tsx tests/http/smoke.ts"
+    "test:http": "node --env-file=.env.test --import tsx tests/http/smoke.ts",
+    "test:migration": "node --env-file=.env.test --import tsx --test tests/migrations/*.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.0",

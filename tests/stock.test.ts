@@ -1,3 +1,4 @@
+import { locationCode } from "../src/services/locations";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calculateStock, stockLabel } from "../src/lib/stock";
@@ -69,4 +70,11 @@ test("CSV escapes quotes and spreadsheet formulas", async () => {
   ).text();
   assert.ok(text.includes("'=HYPERLINK"));
   assert.ok(text.includes('""x""'));
+});
+
+test("location codes reset position per rack and preserve numbers above 99", () => {
+  assert.equal(locationCode("A", 1, 1), "A.01.01");
+  assert.equal(locationCode("A", 1, 2), "A.01.02");
+  assert.equal(locationCode("A", 2, 1), "A.02.01");
+  assert.equal(locationCode("A", 100, 123), "A.100.123");
 });

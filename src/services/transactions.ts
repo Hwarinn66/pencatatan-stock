@@ -1,3 +1,4 @@
+import { hierarchyJoins, hierarchyFields } from "./locations";
 import type { PoolConnection } from "mysql2/promise";
 import { rows, execute, transaction, publish } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -5,7 +6,7 @@ import { calculateStock } from "@/lib/stock";
 import type { Product, StockTransaction } from "@/types";
 export async function lockProduct(id: number, conn: PoolConnection) {
   const [product] = await rows<Product>(
-    "SELECT p.*,l.code location_code FROM products p JOIN locations l ON l.id=p.location_id WHERE p.id=? FOR UPDATE",
+    `SELECT p.*,l.code location_code,${hierarchyFields} FROM products p JOIN locations l ON l.id=p.location_id ${hierarchyJoins} WHERE p.id=? FOR UPDATE`,
     [id],
     conn,
   );
@@ -74,8 +75,8 @@ export async function scan(token: string, mode: "IN" | "OUT", userId: number) {
       );
     const number = await nextNumber(mode, conn);
     const result = await execute(
-      "INSERT INTO stock_transactions(transaction_number,product_id,location_id,location_code,transaction_type,actor_id) VALUES (?,?,?,?,?,?)",
-      [number, p.id, p.location_id, p.location_code, mode, userId],
+      "INSERT INTO stock_transactions(transaction_number,product_id,location_id,location_code,room_name,transaction_type,actor_id) VALUES (?,?,?,?,?,?,?)",
+      [number, p.id, p.location_id, p.location_code, p.room_name, mode, userId],
       conn,
     );
     await publish(conn, "scan");
@@ -204,12 +205,13 @@ export async function adjustment(
       conn,
     );
     const result = await execute(
-      "INSERT INTO stock_transactions(transaction_number,product_id,location_id,location_code,transaction_type,quantity,stock_before,stock_after,status,notes,approved_at,actor_id) VALUES (?,?,?,?,'ADJUSTMENT',?,?,?,'APPROVED',?,UTC_TIMESTAMP(3),?)",
+      "INSERT INTO stock_transactions(transaction_number,product_id,location_id,location_code,room_name,transaction_type,quantity,stock_before,stock_after,status,notes,approved_at,actor_id) VALUES (?,?,?,?,?,'ADJUSTMENT',?,?,?,'APPROVED',?,UTC_TIMESTAMP(3),?)",
       [
         number,
         p.id,
         p.location_id,
         p.location_code,
+        p.room_name,
         delta,
         p.stock,
         input.physical_stock,

@@ -70,10 +70,39 @@ try {
     mode: "IN",
   });
   assert.equal(invalid.status, 422);
+  const room = (
+    await (await request("rooms", "POST", { name: username })).json()
+  ).data;
+  const code =
+    "H" +
+    username.replace(/[^a-f]/g, "").toUpperCase() +
+    String(Date.now())
+      .split("")
+      .map((n) => String.fromCharCode(65 + Number(n)))
+      .join("");
+  const block = (
+    await (
+      await request("blocks", "POST", {
+        room_id: room.id,
+        code: code.slice(0, 20),
+        name: "HTTP block",
+      })
+    ).json()
+  ).data;
+  const rack = (
+    await (
+      await request("racks", "POST", {
+        block_id: block.id,
+        rack_number: 1,
+        name: "HTTP rack",
+      })
+    ).json()
+  ).data;
   const loc = await (
     await request("locations", "POST", {
-      code: username,
-      name: "HTTP test rack",
+      rack_id: rack.id,
+      position_number: 1,
+      name: "HTTP position",
     })
   ).json();
   assert.equal(loc.success, true);
@@ -93,6 +122,24 @@ try {
   const product = (await (await request("products/" + created.data.id)).json())
     .data;
   assert.equal(product.stock, 0);
+  assert.equal(product.room_name, username);
+  assert.ok(product.location_code.endsWith(".01.01"));
+  const roomProducts = await (
+    await request("products?room_id=" + room.id)
+  ).json();
+  assert.equal(roomProducts.data.total, 1);
+  assert.equal(roomProducts.data.items[0].id, product.id);
+  assert.equal(
+    (
+      await request("locations", "POST", {
+        rack_id: rack.id,
+        position_number: 1,
+        name: "duplicate",
+      })
+    ).status,
+    409,
+  );
+
   const qr = await request("products/" + product.id + "/qr");
   assert.equal(qr.status, 200);
   assert.match(await qr.text(), /<svg/);

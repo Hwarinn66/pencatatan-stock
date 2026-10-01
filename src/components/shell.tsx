@@ -33,7 +33,7 @@ const links = [
   ["/history/out", "Riwayat Keluar", ArrowUpFromLine],
   ["/low-stock", "Stock Menipis", TriangleAlert],
   ["/categories", "Kategori", Tags],
-  ["/locations", "Lokasi Rak", MapPin],
+  ["/locations", "Lokasi Gudang", MapPin],
   ["/adjustments", "Stock Adjustment", SlidersHorizontal],
   ["/settings", "Pengaturan", Settings],
 ] as const;

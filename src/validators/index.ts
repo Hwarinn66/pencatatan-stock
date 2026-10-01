@@ -32,8 +32,24 @@ export const adjustmentSchema = z.object({
 export const categorySchema = z.object({
   name: z.string().trim().min(1).max(100),
 });
+export const roomSchema = z.object({ name: z.string().trim().min(1).max(100) });
+export const blockSchema = z.object({
+  room_id: idSchema,
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{1,20}$/),
+  name: z.string().trim().min(1).max(100),
+});
+export const rackSchema = z.object({
+  block_id: idSchema,
+  rack_number: z.coerce.number().int().min(1).max(999999),
+  name: z.string().trim().min(1).max(100),
+});
 export const locationSchema = z.object({
-  code: z.string().trim().min(1).max(50),
+  rack_id: idSchema,
+  position_number: z.coerce.number().int().min(1).max(999999),
   name: z.string().trim().min(1).max(100),
   description: z.string().max(2000).nullable().optional(),
   active: z.boolean().optional(),
@@ -51,6 +67,9 @@ export const listSchema = z.object({
   category_id: idSchema.optional(),
   location_id: idSchema.optional(),
   product_id: idSchema.optional(),
+  room_id: idSchema.optional(),
+  block_id: idSchema.optional(),
+  rack_id: idSchema.optional(),
   stock: z.enum(["low", "zero", "safe"]).optional(),
   status: z.enum(["PENDING", "APPROVED", "CANCELLED"]).optional(),
   active: z.enum(["0", "1", "all"]).default("1"),

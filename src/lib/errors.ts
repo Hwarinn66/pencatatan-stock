@@ -45,7 +45,8 @@ export function errorResponse(error: unknown) {
       {
         success: false,
         code: "DUPLICATE",
-        message: "SKU, rak aktif, nama, atau transaksi sudah digunakan.",
+        message:
+          "SKU, kode blok, nomor rak/posisi, nama, atau transaksi sudah digunakan.",
       },
       { status: 409 },
     );

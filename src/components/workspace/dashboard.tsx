@@ -67,7 +67,8 @@ function PendingCard({
           </div>
           <h3 className="text-base font-semibold">{item.name}</h3>
           <p className="text-xs text-slate-500 mt-1">
-            {item.sku} · Rak {item.location_code} · {item.transaction_number}
+            {item.sku} · {item.room_name || "Ruangan lama"} · Lokasi{" "}
+            {item.location_code} · {item.transaction_number}
           </p>
           <p className="text-[11px] text-slate-400 mt-2">
             Scan {timestamp(item.scanned_at, timezone)}

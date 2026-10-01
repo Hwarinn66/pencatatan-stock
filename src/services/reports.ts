@@ -1,3 +1,4 @@
+import { hierarchyJoins } from "./locations";
 import { z } from "zod";
 import { rows } from "@/lib/db";
 import { listSchema } from "@/validators";
@@ -13,8 +14,10 @@ export async function listProducts(f: Filters) {
     args.push(Number(f.active));
   }
   if (f.q) {
-    where.push("(p.name LIKE ? OR p.sku LIKE ? OR l.code LIKE ?)");
-    args.push(...Array(3).fill(`%${f.q}%`));
+    where.push(
+      "(p.name LIKE ? OR p.sku LIKE ? OR l.code LIKE ? OR rm.name LIKE ?)",
+    );
+    args.push(...Array(4).fill(`%${f.q}%`));
   }
   if (f.category_id) {
     where.push("p.category_id=?");
@@ -23,6 +26,18 @@ export async function listProducts(f: Filters) {
   if (f.location_id) {
     where.push("p.location_id=?");
     args.push(f.location_id);
+  }
+  if (f.room_id) {
+    where.push("rm.id=?");
+    args.push(f.room_id);
+  }
+  if (f.block_id) {
+    where.push("b.id=?");
+    args.push(f.block_id);
+  }
+  if (f.rack_id) {
+    where.push("r.id=?");
+    args.push(f.rack_id);
   }
   if (f.stock)
     where.push(
@@ -38,6 +53,7 @@ export async function listProducts(f: Filters) {
   };
   const [{ total }] = await rows<{ total: number }>(
     "SELECT COUNT(*) total FROM products p JOIN locations l ON l.id=p.location_id" +
+      hierarchyJoins +
       clause,
     args,
   );
@@ -83,9 +99,9 @@ export async function history(type: string, f: Filters) {
   const args: unknown[] = [type];
   if (f.q) {
     where.push(
-      "(p.name LIKE ? OR p.sku LIKE ? OR t.location_code LIKE ? OR t.transaction_number LIKE ?)",
+      "(p.name LIKE ? OR p.sku LIKE ? OR t.location_code LIKE ? OR t.transaction_number LIKE ? OR t.room_name LIKE ?)",
     );
-    args.push(...Array(4).fill(`%${f.q}%`));
+    args.push(...Array(5).fill(`%${f.q}%`));
   }
   if (f.product_id) {
     where.push("t.product_id=?");

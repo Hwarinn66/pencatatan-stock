@@ -7,6 +7,7 @@ import {
   ProductDetail,
   HistoryPage,
   LookupsPage,
+  LocationManager,
   AdjustmentsPage,
   SettingsPage,
 } from "@/components/workspace";
@@ -29,8 +30,8 @@ export default async function Page({
   }
   if (key === "history/in") return <HistoryPage type="in" />;
   if (key === "history/out") return <HistoryPage type="out" />;
-  if (key === "categories" || key === "locations")
-    return <LookupsPage kind={key} />;
+  if (key === "locations") return <LocationManager />;
+  if (key === "categories") return <LookupsPage kind={key} />;
   if (key === "adjustments") return <AdjustmentsPage />;
   if (key === "settings") return <SettingsPage />;
   notFound();

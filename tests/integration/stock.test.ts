@@ -1,3 +1,4 @@
+import { mutateLocation, listLocations } from "../../src/services/locations";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { db, rows, execute } from "../../src/lib/db";
@@ -20,21 +21,46 @@ let category: number;
 let location: number;
 let product: number;
 let token: string;
+let room: number;
+let block: number;
+let rack: number;
 before(async () => {
   await execute("DELETE FROM stock_events");
   await execute("DELETE FROM stock_transactions");
   await execute("DELETE FROM products");
   await execute("DELETE FROM locations");
+  await execute("DELETE FROM racks");
+  await execute("DELETE FROM blocks");
+  await execute("DELETE FROM rooms");
   await execute("DELETE FROM categories");
   await execute("DELETE FROM sessions");
   await execute("DELETE FROM users");
   category = (await execute("INSERT INTO categories(name) VALUES ('Testing')"))
     .insertId;
+  room = (
+    await mutateLocation("rooms", "POST", undefined, { name: "Ruangan Test" })
+  ).id!;
+  block = (
+    await mutateLocation("blocks", "POST", undefined, {
+      room_id: room,
+      code: "T",
+      name: "Blok Test",
+    })
+  ).id!;
+  rack = (
+    await mutateLocation("racks", "POST", undefined, {
+      block_id: block,
+      rack_number: 1,
+      name: "Rak 01",
+    })
+  ).id!;
   location = (
-    await execute(
-      "INSERT INTO locations(code,name) VALUES ('T-01','Test Rack')",
-    )
-  ).insertId;
+    await mutateLocation("locations", "POST", undefined, {
+      rack_id: rack,
+      position_number: 1,
+      name: "Posisi 01",
+    })
+  ).id!;
   user = (
     await execute(
       "INSERT INTO users(username,password_hash) VALUES ('test','disabled')",
@@ -69,9 +95,73 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
     assert.match(item.qr_token, /^[0-9a-f-]{36}$/);
     token = item.qr_token;
   });
+  await t.test(
+    "multiple products in one rack, independent numbering per rack",
+    async () => {
+      const slot2 = (
+        await mutateLocation("locations", "POST", undefined, {
+          rack_id: rack,
+          position_number: 2,
+          name: "Posisi 02",
+        })
+      ).id!;
+      const other = (
+        await createProduct({
+          sku: "SLOT-2",
+          name: "Keyboard",
+          unit: "PCS",
+          category_id: category,
+          location_id: slot2,
+        })
+      ).id;
+      const available = await listLocations("locations");
+      assert.equal(available.find((l) => l.id === location)?.code, "T.01.01");
+      assert.equal(available.find((l) => l.id === slot2)?.code, "T.01.02");
+      await assert.rejects(
+        mutateLocation("locations", "POST", undefined, {
+          rack_id: rack,
+          position_number: 2,
+          name: "Duplicate",
+        }),
+        { code: "ER_DUP_ENTRY" },
+      );
+      await assert.rejects(
+        mutateLocation("blocks", "PATCH", block, {
+          room_id: room,
+          code: "CHANGED",
+          name: "Block",
+        }),
+        { code: "IN_USE" },
+      );
+      const qr = (
+        await rows<{ qr_token: string }>(
+          "SELECT qr_token FROM products WHERE id=?",
+          [other],
+        )
+      )[0].qr_token;
+      const scans = await Promise.all([
+        scan(token, "IN", user),
+        scan(qr, "IN", user),
+      ]);
+      assert.equal(scans.length, 2);
+      await Promise.all(scans.map((s) => cancel(s.id)));
+      await assert.rejects(
+        mutateLocation("locations", "PATCH", location, {
+          rack_id: rack,
+          position_number: 3,
+          name: "Moved",
+        }),
+        { code: "IN_USE" },
+      );
+    },
+  );
   await t.test("7 OUT zero rejected, no pending created", async () => {
     await assert.rejects(scan(token, "OUT", user), { code: "STOCK_EMPTY" });
-    assert.equal((await rows("SELECT id FROM stock_transactions")).length, 0);
+    assert.equal(
+      (await rows("SELECT id FROM stock_transactions WHERE status='PENDING'"))
+        .length,
+      0,
+    );
   });
   await t.test("2 IN scan does not change stock, approve +10", async () => {
     const s = await scan(token, "IN", user);
@@ -130,7 +220,7 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
     assert.equal((await p()).stock, 2);
     await assert.rejects(approve(s.id, 3, user), { code: "ALREADY_PROCESSED" });
   });
-  await t.test("10 duplicate rack rejected", async () => {
+  await t.test("10 duplicate occupied position rejected", async () => {
     await assert.rejects(
       createProduct({
         sku: "BRG-002",
@@ -200,18 +290,31 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
   await t.test(
     "rack move preserves old history and invalidates regenerated QR",
     async () => {
+      const rack2 = (
+        await mutateLocation("racks", "POST", undefined, {
+          block_id: block,
+          rack_number: 2,
+          name: "Rak 02",
+        })
+      ).id!;
       const loc2 = (
-        await execute(
-          "INSERT INTO locations(code,name) VALUES ('T-02','Rack 2')",
-        )
-      ).insertId;
+        await mutateLocation("locations", "POST", undefined, {
+          rack_id: rack2,
+          position_number: 1,
+          name: "Posisi 01",
+        })
+      ).id!;
+      assert.equal(
+        (await listLocations("locations")).find((l) => l.id === loc2)?.code,
+        "T.02.01",
+      );
       await editProduct(product, { location_id: loc2 });
       const [old] = await rows<{ location_id: number; location_code: string }>(
         "SELECT * FROM stock_transactions WHERE product_id=? ORDER BY id LIMIT 1",
         [product],
       );
       assert.equal(old.location_id, location);
-      assert.equal(old.location_code, "T-01");
+      assert.equal(old.location_code, "T.01.01");
       await regenerate(product);
       await assert.rejects(scan(token, "IN", user), { code: "QR_NOT_FOUND" });
       token = (await p()).qr_token;

@@ -8,6 +8,13 @@ export interface Product {
   stock: number;
   location_id: number;
   location_code: string;
+  room_name: string | null;
+  room_id: number;
+  block_id: number;
+  block_code: string;
+  rack_id: number;
+  rack_number: number;
+  position_number: number;
   qr_token: string;
   image: string | null;
   description: string | null;
@@ -21,6 +28,7 @@ export interface StockTransaction {
   product_id: number;
   location_id: number;
   location_code: string;
+  room_name: string | null;
   transaction_type: "IN" | "OUT" | "ADJUSTMENT";
   quantity: number | null;
   stock_before: number | null;
@@ -41,4 +49,17 @@ export interface Lookup {
   code?: string;
   active?: number;
   description?: string;
+}
+
+export interface LocationLookup extends Lookup {
+  room_id?: number;
+  room_name?: string;
+  block_id?: number;
+  block_code?: string;
+  rack_id?: number;
+  rack_number?: number;
+  position_number?: number;
+  product_id?: number | null;
+  product_name?: string | null;
+  legacy_code?: string | null;
 }

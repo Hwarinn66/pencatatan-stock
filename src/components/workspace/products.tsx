@@ -1,4 +1,5 @@
 "use client";
+import { LocationPicker } from "@/components/location-picker";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,7 @@ import { useLive } from "@/hooks/use-live";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { Product, Lookup } from "@/types";
+import type { Product, Lookup, LocationLookup } from "@/types";
 import { Heading, State, StockBadge, Pager, useData } from "./shared";
 import { HistoryPage } from "./management";
 export function ProductsPage({ low = false }: { low?: boolean }) {
@@ -17,6 +18,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [rack, setRack] = useState("");
+  const [roomFilter, setRoomFilter] = useState("");
   const [stock, setStock] = useState(low ? "low" : "");
   const [active, setActive] = useState("1");
   const [sort, setSort] = useState("name");
@@ -33,6 +35,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
     active,
     ...(category ? { category_id: category } : {}),
     ...(rack ? { location_id: rack } : {}),
+    ...(roomFilter ? { room_id: roomFilter } : {}),
     ...(stock ? { stock } : {}),
   });
   const list = useData<{ items: Product[]; total: number }>(
@@ -40,7 +43,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
     version,
   );
   const categories = useData<Lookup[]>("categories");
-  const locations = useData<Lookup[]>("locations");
+  const locations = useData<LocationLookup[]>("locations");
   const reset = (fn: () => void) => {
     fn();
     setPage(1);
@@ -72,7 +75,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
         <div className="flex flex-wrap gap-3">
           <Input
             aria-label="Cari barang"
-            placeholder="Cari nama, SKU, rak…"
+            placeholder="Cari nama, SKU, lokasi…"
             className="max-w-xs"
             value={q}
             onChange={(e) => reset(() => setQ(e.target.value))}
@@ -90,16 +93,39 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
             ))}
           </select>
           <select
-            aria-label="Rak"
+            aria-label="Filter ruangan"
+            value={roomFilter}
+            onChange={(e) =>
+              reset(() => {
+                setRoomFilter(e.target.value);
+                setRack("");
+              })
+            }
+          >
+            <option value="">Semua ruangan</option>
+            {[
+              ...new Map(
+                (locations.data || []).map((l) => [l.room_id, l]),
+              ).values(),
+            ].map((l) => (
+              <option key={l.room_id} value={l.room_id}>
+                {l.room_name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Posisi"
             value={rack}
             onChange={(e) => reset(() => setRack(e.target.value))}
           >
-            <option value="">Semua rak</option>
-            {locations.data?.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.code}
-              </option>
-            ))}
+            <option value="">Semua posisi</option>
+            {locations.data
+              ?.filter((l) => !roomFilter || l.room_id === Number(roomFilter))
+              .map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.room_name} / {l.code}
+                </option>
+              ))}
           </select>
           <select
             aria-label="Filter stok"
@@ -156,7 +182,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                   "Kategori",
                   "Stock",
                   "Satuan",
-                  "Rak",
+                  "Lokasi",
                   "Status",
                   "Action",
                 ].map((h) => (
@@ -182,6 +208,9 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
                     <span className="bg-slate-100 rounded px-2 py-1 text-xs">
                       {p.location_code}
                     </span>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {p.room_name}
+                    </p>
                   </td>
                   <td>
                     {p.active ? (
@@ -241,7 +270,7 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
 export function ProductForm({ id }: { id?: number }) {
   const router = useRouter();
   const categories = useData<Lookup[]>("categories");
-  const locations = useData<Lookup[]>("locations");
+  const locations = useData<LocationLookup[]>("locations");
   const [initial, setInitial] = useState<Product>();
   const [image, setImage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -259,7 +288,7 @@ export function ProductForm({ id }: { id?: number }) {
     <>
       <Heading
         title={id ? "Edit barang" : "Tambah barang"}
-        description="Satu barang, satu rak aktif, satu QR. Stok awal barang baru adalah 0."
+        description="Satu barang, satu posisi aktif, satu QR. Stok awal barang baru adalah 0."
       />
       <State
         error={error || categories.error || locations.error}
@@ -287,7 +316,7 @@ export function ProductForm({ id }: { id?: number }) {
               );
               if (
                 !confirm(
-                  `Anda akan memindahkan ${initial.name} dari Rak ${initial.location_code} ke Rak ${target?.code}. Lanjutkan?`,
+                  `Anda akan memindahkan ${initial.name} dari posisi ${initial.location_code} ke posisi ${target?.code}. Lanjutkan?`,
                 )
               )
                 return;
@@ -366,30 +395,11 @@ export function ProductForm({ id }: { id?: number }) {
                   defaultValue={initial?.unit || "PCS"}
                 />
               </div>
-              <div>
-                <label htmlFor="location_id">Lokasi Rak</label>
-                <select
-                  id="location_id"
-                  name="location_id"
-                  className="w-full"
-                  required
-                  defaultValue={initial?.location_id || ""}
-                >
-                  <option value="" disabled>
-                    Pilih rak
-                  </option>
-                  {locations.data
-                    ?.filter((l) => l.active || l.id === initial?.location_id)
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-slate-400 mt-2">
-                  Rak harus tersedia untuk satu barang aktif.
-                </p>
-              </div>
+              <LocationPicker
+                locations={locations.data}
+                initialId={initial?.location_id}
+                productId={id}
+              />
               <div>
                 <label htmlFor="image">Foto (opsional, maks. 1 MB)</label>
                 <Input
@@ -483,7 +493,7 @@ export function ProductDetail({
     <>
       <Heading
         title={qrOnly ? "QR barang" : p.name}
-        description={`${p.sku} · Rak ${p.location_code}`}
+        description={`${p.sku} · ${p.room_name} · ${p.location_code}`}
       >
         <Button variant="outline" asChild>
           <Link href={`/products/${id}/edit`}>Edit Barang</Link>
@@ -498,7 +508,8 @@ export function ProductDetail({
         <Card className="print-label text-center">
           <h2 className="font-bold text-xl uppercase">{p.name}</h2>
           <p className="text-sm mt-3">SKU: {p.sku}</p>
-          <p className="font-bold mt-1">RAK: {p.location_code}</p>
+          <p className="font-bold mt-1">LOKASI: {p.location_code}</p>
+          <p className="text-xs mt-1">{p.room_name}</p>
           <img
             src={src}
             alt={"QR " + p.name}
@@ -563,7 +574,8 @@ export function ProductDetail({
               {[
                 ["Kategori", p.category_name],
                 ["Status", p.active ? "Aktif" : "Nonaktif"],
-                ["Rak", p.location_code],
+                ["Ruangan", p.room_name || "—"],
+                ["Lokasi", p.location_code],
                 ["Satuan", p.unit],
                 ["Dibuat", timestamp(p.created_at, settings.data?.timezone)],
                 [

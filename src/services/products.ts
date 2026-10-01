@@ -1,3 +1,4 @@
+import { hierarchyJoins, hierarchyFields } from "./locations";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { rows, execute, transaction, publish } from "@/lib/db";
@@ -6,8 +7,7 @@ import { productSchema, editProductSchema } from "@/validators";
 import type { Product } from "@/types";
 import { lockProduct, ensureUnlocked } from "./transactions";
 import type { PoolConnection } from "mysql2/promise";
-export const productSelect =
-  "SELECT p.*,c.name category_name,l.code location_code FROM products p JOIN categories c ON c.id=p.category_id JOIN locations l ON l.id=p.location_id";
+export const productSelect = `SELECT p.*,c.name category_name,l.code location_code,${hierarchyFields} FROM products p JOIN categories c ON c.id=p.category_id JOIN locations l ON l.id=p.location_id ${hierarchyJoins}`;
 export async function getProduct(id: number) {
   const [p] = await rows<Product>(productSelect + " WHERE p.id=?", [id]);
   if (!p) throw new AppError("NOT_FOUND", "Barang tidak ditemukan.", 404);
@@ -26,7 +26,7 @@ async function checkRack(
   if (!rack || !rack.active)
     throw new AppError(
       "INVALID_LOCATION",
-      "Rak tidak ditemukan atau tidak aktif.",
+      "Posisi tidak ditemukan atau tidak aktif.",
     );
   const [occupied] = await rows<{ name: string }>(
     "SELECT name FROM products WHERE location_id=? AND active=1 AND id<>?",
@@ -36,7 +36,7 @@ async function checkRack(
   if (occupied)
     throw new AppError(
       "LOCATION_IN_USE",
-      `Rak ${rack.code} sudah digunakan oleh ${occupied.name}. Silakan pilih rak lain.`,
+      `Posisi ${rack.code} sudah digunakan oleh ${occupied.name}. Silakan pilih posisi lain.`,
       409,
     );
 }
