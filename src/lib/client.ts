@@ -13,6 +13,7 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const response = await fetch("/api/" + path, {
     ...init,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...init?.headers },
     cache: "no-store",
   });
