@@ -21,8 +21,9 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 
 - Satu rak boleh berisi beberapa barang di **posisi berbeda**. Satu posisi hanya boleh dipakai satu barang aktif.
 - Nomor posisi unik **per rak**, sehingga posisi 1 pada rak A.01 dan A.02 diperbolehkan. Nomor rak unik per blok. Nomor ditampilkan minimal dua digit, tanpa memotong angka di atas 99.
-- **Kode blok unik di seluruh gudang**, misalnya A di Ruangan 1 dan B di Ruangan 2. Ini membuat A.01.01 tidak ambigu tanpa awalan ruangan. Nama ruangan tetap ditampilkan di detail, label QR, scanner, antrean dan histori baru.
-- Buka **Lokasi Gudang** → buat Ruangan → Blok → Rak → Posisi Barang. UI menyarankan nomor berikutnya pada induk yang dipilih; untuk rak baru posisi dimulai dari 1. Angka boleh disesuaikan.
+- Layout standar sudah disiapkan: **Ruangan 1–5**, setiap ruangan memiliki **Blok A–D**, dan setiap blok memiliki **Rak 01–25**.
+- Kode blok unik **per ruangan**, sehingga Blok A boleh ada di Ruangan 1, Ruangan 2, dan seterusnya. Kode posisi seperti A.01.01 juga boleh berulang di ruangan berbeda; nama ruangan selalu ditampilkan sebagai pembeda.
+- **Nomor penempatan tidak dibuat otomatis.** Buka **Lokasi Gudang → Posisi Barang**, pilih rak, lalu ketik nomor penempatan yang benar-benar digunakan. Satu nomor posisi hanya boleh ada sekali pada rak yang sama.
 - Tambah/Edit Barang memakai empat pilihan bertingkat. Posisi terisi ditandai dan tidak dapat dipilih untuk barang lain. Backend dan UNIQUE constraint tetap menjadi pengaman akhir terhadap dua request bersamaan.
 - UUID QR tetap **per barang**, bukan per rak; tempel label pada **posisi barang** masing-masing. IN/OUT, anti-double-scan dan approval tidak berubah.
 - Identitas blok/rak yang sudah berisi anak dan identitas posisi yang sudah dipakai tidak dapat diganti. Buat lokasi tujuan dan pindahkan barang lewat Edit Barang. Nama/keterangan tetap dapat diedit. Histori menyimpan kode lokasi dan nama ruangan saat transaksi.
@@ -30,7 +31,7 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 - Master baru: GET/POST `/api/rooms` (`name`), `/api/blocks` (`room_id,code,name`), `/api/racks` (`block_id,rack_number,name`), serta PATCH/DELETE `/:id` masing-masing. Semua memerlukan session dan validasi.
 - `products.location_id` tetap menunjuk ID posisi. Tabel `locations` tidak dihapus sehingga foreign key produk/histori tetap stabil. Filter barang mendukung `room_id`, `block_id`, `rack_id`, dan `location_id`.
 
-### Upgrade database yang sudah dipakai (v1 → v2)
+### Upgrade database yang sudah dipakai
 
 **Jangan import ulang `database.sql` ke database lama.** Gunakan migrasi berikut sekali:
 
@@ -43,6 +44,8 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 7. Jalankan source baru. DDL MySQL melakukan implicit commit; bila migrasi terhenti, **restore backup** sebelum mengulang. File migrasi bukan script idempotent.
 
 Untuk instalasi baru, cukup import `database.sql` terbaru; **tidak perlu menjalankan migrasi**. Uji migrasi otomatis: `npm run test:migration` menggunakan database sementara acak dan memerlukan izin CREATE/DROP DATABASE pada server test. Script menolak konfigurasi DB_NAME yang tidak berakhiran `_test`.
+
+Untuk database yang sudah memakai hierarki lokasi v2/v3, jalankan **`migrations/004_standard_warehouse_layout.sql` sekali** setelah backup. Migrasi ini mengizinkan Blok A–D berulang di tiap ruangan, menambahkan Ruangan 1–5, Blok A–D, dan Rak 01–25 tanpa menghapus barang atau histori yang sudah ada. Setelah itu, posisi tetap dibuat manual sesuai kebutuhan.
 
 ## Kode Barang dan label Fast/Slow manual
 
@@ -64,7 +67,7 @@ Pilihan **Barang → Urutkan**:
 | Nama A–Z (default)                      | Semua barang sesuai filter, alfabetis tanpa memisahkan label                         |
 | Stok terbanyak                          | Stok saat ini terbesar dahulu, nama A–Z untuk nilai sama                             |
 | Total OUT terbanyak                     | Jumlah unit OUT APPROVED sepanjang histori, terbesar dahulu; tidak memengaruhi label |
-| Lokasi A.01.01 → terakhir               | Blok, nomor rak, lalu posisi secara numerik                                          |
+| Lokasi A.01.01 → terakhir               | Ruangan, blok, nomor rak, lalu posisi secara numerik                                 |
 | Kelompok Fast → Slow, masing-masing A–Z | Fast A–Z, Slow A–Z, lalu Belum diberi label A–Z                                      |
 | Fast moving saja · A–Z                  | Hanya label manual Fast                                                              |
 | Slow moving saja · A–Z                  | Hanya label manual Slow                                                              |
@@ -129,7 +132,7 @@ Restart server setelah mengubah `.env.local`. Jangan commit `.env.local`, `.env.
 
 ## Data awal
 
-Instalasi baru tidak membuat barang contoh. Dashboard dimulai tanpa barang dan tanpa histori transaksi. Kategori serta struktur lokasi contoh tetap tersedia agar Anda bisa langsung menambahkan barang sendiri.
+Instalasi baru tidak membuat barang contoh. Dashboard dimulai tanpa barang dan tanpa histori transaksi. Struktur gudang awal berisi Ruangan 1–5, Blok A–D pada setiap ruangan, dan Rak 01–25 pada setiap blok. Nomor penempatan belum dibuat dan diisi manual sesuai kebutuhan.
 
 Untuk mengosongkan database operasional yang sudah dipakai dan kembali ke kondisi awal tanpa menghapus akun login, kategori, atau struktur lokasi gudang:
 
@@ -137,7 +140,7 @@ Untuk mengosongkan database operasional yang sudah dipakai dan kembali ke kondis
 npm run data:reset -- --yes
 ```
 
-Perintah ini menghapus seluruh barang, transaksi pending, histori IN/OUT/adjustment, counter nomor transaksi, dan event realtime. ID barang/transaksi juga dimulai kembali dari 1. Gunakan hanya setelah backup bila data lama masih diperlukan.
+Perintah ini menghapus seluruh barang, seluruh nomor penempatan, transaksi pending, histori IN/OUT/adjustment, counter nomor transaksi, dan event realtime. Ruangan 1–5, Blok A–D, Rak 01–25, kategori, dan akun login tetap dipertahankan. ID barang/transaksi/posisi juga dimulai kembali dari 1. Gunakan hanya setelah backup bila data lama masih diperlukan.
 
 ## Akses dari smartphone
 

@@ -69,7 +69,7 @@ export async function listProducts(f: z.infer<typeof productListSchema>) {
     stock: `p.stock ${direction},p.name ASC`,
     out_total: `COALESCE(mv.out_total,0) ${direction},p.name ASC`,
     // Rack and slot numbers are integers: A.02 comes before A.10 and A.100.
-    location: `b.code ${direction},r.rack_number ${direction},l.position_number ${direction},p.name ASC`,
+    location: `rm.name ${direction},b.code ${direction},r.rack_number ${direction},l.position_number ${direction},p.name ASC`,
     fast: "p.name ASC",
     slow: "p.name ASC",
     movement:

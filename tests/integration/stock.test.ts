@@ -155,6 +155,39 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
       );
     },
   );
+  await t.test("same block/rack/position code may repeat in another room", async () => {
+    const room2 = (
+      await mutateLocation("rooms", "POST", undefined, { name: "Ruangan Test 2" })
+    ).id!;
+    const block2 = (
+      await mutateLocation("blocks", "POST", undefined, {
+        room_id: room2,
+        code: "T",
+        name: "Blok Test",
+      })
+    ).id!;
+    const rack2 = (
+      await mutateLocation("racks", "POST", undefined, {
+        block_id: block2,
+        rack_number: 1,
+        name: "Rak 01",
+      })
+    ).id!;
+    const location2 = (
+      await mutateLocation("locations", "POST", undefined, {
+        rack_id: rack2,
+        position_number: 1,
+        name: "Posisi 01",
+      })
+    ).id!;
+    const locations = await listLocations("locations");
+    const first = locations.find((l) => l.id === location)!;
+    const second = locations.find((l) => l.id === location2)!;
+    assert.equal(first.code, "T.01.01");
+    assert.equal(second.code, "T.01.01");
+    assert.notEqual(first.room_id, second.room_id);
+  });
+
   await t.test("7 OUT zero rejected, no pending created", async () => {
     await assert.rejects(scan(token, "OUT", user), { code: "STOCK_EMPTY" });
     assert.equal(

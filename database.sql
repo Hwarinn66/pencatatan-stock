@@ -27,7 +27,8 @@ CREATE TABLE rooms (
 ) ENGINE=InnoDB;
 CREATE TABLE blocks (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, room_id INT UNSIGNED NOT NULL,
- code VARCHAR(20) NOT NULL UNIQUE, name VARCHAR(100) NOT NULL,
+ code VARCHAR(20) NOT NULL, name VARCHAR(100) NOT NULL,
+ UNIQUE KEY uq_block_code(room_id,code),
  FOREIGN KEY(room_id) REFERENCES rooms(id),
  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
@@ -42,7 +43,7 @@ CREATE TABLE racks (
 ) ENGINE=InnoDB;
 CREATE TABLE locations (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, rack_id INT UNSIGNED NOT NULL,
- position_number INT UNSIGNED NOT NULL, code VARCHAR(50) NOT NULL UNIQUE,
+ position_number INT UNSIGNED NOT NULL, code VARCHAR(50) NOT NULL,
  name VARCHAR(100) NOT NULL, description TEXT, active BOOLEAN NOT NULL DEFAULT 1,
  legacy_code VARCHAR(50) NULL,
  UNIQUE KEY uq_rack_position(rack_id,position_number), CHECK(position_number>0),
@@ -87,6 +88,7 @@ CREATE TABLE stock_transactions (
  CHECK(transaction_type='ADJUSTMENT' OR quantity IS NULL OR quantity > 0),
  CHECK(status <> 'APPROVED' OR (quantity IS NOT NULL AND stock_before IS NOT NULL AND stock_after IS NOT NULL AND approved_at IS NOT NULL))
 ) ENGINE=InnoDB;
+CREATE INDEX idx_locations_code ON locations(code);
 CREATE INDEX idx_products_location ON products(location_id);
 CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_movement_name ON products(movement_class,name);
@@ -101,12 +103,20 @@ CREATE TABLE stock_events (
  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB;
 INSERT INTO categories(name) VALUES ('Elektronik'),('Kabel'),('ATK'),('Sparepart');
-INSERT INTO rooms(name) VALUES ('Ruangan 1');
-INSERT INTO blocks(room_id,code,name) VALUES (1,'A','Blok A'),(1,'B','Blok B');
-INSERT INTO racks(block_id,rack_number,name) VALUES (1,1,'Rak A.01'),(1,2,'Rak A.02'),(2,1,'Rak B.01'),(1,3,'Rak A.03'),(1,5,'Rak A.05');
-INSERT INTO locations(rack_id,position_number,code,name) VALUES
- (1,1,'A.01.01','Posisi 01'),(2,1,'A.02.01','Posisi 01'),(3,1,'B.01.01','Posisi 01'),
- (4,1,'A.03.01','Posisi 01'),(5,1,'A.05.01','Posisi 01'),
- (1,2,'A.01.02','Posisi 02'),(2,2,'A.02.02','Posisi 02'),(2,3,'A.02.03','Posisi 03');
+INSERT INTO rooms(name) VALUES
+ ('Ruangan 1'),('Ruangan 2'),('Ruangan 3'),('Ruangan 4'),('Ruangan 5');
+INSERT INTO blocks(room_id,code,name)
+ SELECT rm.id,c.code,CONCAT('Blok ',c.code)
+ FROM rooms rm
+ CROSS JOIN (SELECT 'A' code UNION ALL SELECT 'B' UNION ALL SELECT 'C' UNION ALL SELECT 'D') c
+ WHERE rm.name IN ('Ruangan 1','Ruangan 2','Ruangan 3','Ruangan 4','Ruangan 5');
+INSERT INTO racks(block_id,rack_number,name)
+ SELECT b.id,n.n,CONCAT('Rak ',b.code,'.',LPAD(n.n,2,'0'))
+ FROM blocks b
+ JOIN rooms rm ON rm.id=b.room_id
+ CROSS JOIN (SELECT 1 n UNION ALL SELECT 2 n UNION ALL SELECT 3 n UNION ALL SELECT 4 n UNION ALL SELECT 5 n UNION ALL SELECT 6 n UNION ALL SELECT 7 n UNION ALL SELECT 8 n UNION ALL SELECT 9 n UNION ALL SELECT 10 n UNION ALL SELECT 11 n UNION ALL SELECT 12 n UNION ALL SELECT 13 n UNION ALL SELECT 14 n UNION ALL SELECT 15 n UNION ALL SELECT 16 n UNION ALL SELECT 17 n UNION ALL SELECT 18 n UNION ALL SELECT 19 n UNION ALL SELECT 20 n UNION ALL SELECT 21 n UNION ALL SELECT 22 n UNION ALL SELECT 23 n UNION ALL SELECT 24 n UNION ALL SELECT 25 n) n
+ WHERE rm.name IN ('Ruangan 1','Ruangan 2','Ruangan 3','Ruangan 4','Ruangan 5')
+   AND b.code IN ('A','B','C','D');
+-- Posisi barang sengaja tidak dibuat otomatis. Buat hanya nomor posisi yang benar-benar dipakai.
 -- Tidak ada barang contoh. Isi data barang sendiri melalui aplikasi.
 -- Tidak ada password default. Buat akun dengan npm run user:create -- admin "PASSWORD-ANDA".

@@ -11,19 +11,22 @@ try {
   await transaction(async (conn) => {
     await execute("DELETE FROM stock_transactions", [], conn);
     await execute("DELETE FROM products", [], conn);
+    await execute("DELETE FROM locations", [], conn);
     await execute("DELETE FROM transaction_sequences", [], conn);
     await execute("DELETE FROM stock_events", [], conn);
   });
 
   await execute("ALTER TABLE stock_transactions AUTO_INCREMENT=1");
   await execute("ALTER TABLE products AUTO_INCREMENT=1");
+  await execute("ALTER TABLE locations AUTO_INCREMENT=1");
   await execute("ALTER TABLE stock_events AUTO_INCREMENT=1");
 
   console.log("Reset selesai.");
   console.log("- Semua barang dihapus");
   console.log("- Semua histori/pending transaksi dihapus");
+  console.log("- Semua nomor penempatan dihapus agar dapat diisi ulang manual");
   console.log("- Counter transaksi dan event direset");
-  console.log("- Akun login, kategori, dan struktur lokasi gudang tetap dipertahankan");
+  console.log("- Akun login, kategori, Ruangan 1-5, Blok A-D, dan Rak 01-25 tetap dipertahankan");
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

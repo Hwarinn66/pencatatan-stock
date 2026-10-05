@@ -46,25 +46,18 @@ export function LocationManager() {
   };
   const selectedRack = racks.data?.find((r) => r.id === Number(parent));
   const selectedBlock = blocks.data?.find((b) => b.id === Number(parent));
-  const suggested =
-    kind === "locations"
-      ? Math.max(
-          0,
-          ...(positions.data || [])
-            .filter((p) => p.rack_id === Number(parent))
-            .map((p) => p.position_number || 0),
-        ) + 1
-      : Math.max(
-          0,
-          ...(racks.data || [])
-            .filter((r) => r.block_id === Number(parent))
-            .map((r) => r.rack_number || 0),
-        ) + 1;
+  const suggestedRack =
+    Math.max(
+      0,
+      ...(racks.data || [])
+        .filter((r) => r.block_id === Number(parent))
+        .map((r) => r.rack_number || 0),
+    ) + 1;
   return (
     <>
       <Heading
         title="Lokasi gudang"
-        description="Ruangan → Blok → Rak → Posisi barang. Contoh lokasi: A.01.02."
+        description="Ruangan 1–5 → Blok A–D → Rak 01–25 → posisi barang yang Anda input sendiri."
       />
       <div
         className="flex flex-wrap gap-2 mb-5"
@@ -297,9 +290,7 @@ export function LocationManager() {
             )}
             {kind === "blocks" && (
               <div className="mb-4">
-                <label htmlFor="block-code">
-                  Kode blok (unik seluruh gudang)
-                </label>
+                <label htmlFor="block-code">Kode blok</label>
                 <Input
                   id="block-code"
                   name="code"
@@ -310,8 +301,7 @@ export function LocationManager() {
                   defaultValue={editing?.code}
                 />
                 <p className="text-[11px] text-slate-400 mt-2">
-                  Gunakan huruf, contoh A, B, AA. Kode tidak berulang
-                  antar-ruangan.
+                  Gunakan huruf. Kode blok unik di dalam ruangan yang dipilih, sehingga Blok A boleh ada di setiap ruangan.
                 </p>
               </div>
             )}
@@ -334,12 +324,14 @@ export function LocationManager() {
                       ? kind === "racks"
                         ? editing.rack_number
                         : editing.position_number
-                      : suggested
+                      : kind === "racks"
+                        ? suggestedRack
+                        : undefined
                   }
                 />
                 <p className="text-[11px] mt-2 text-emerald-700">
                   {kind === "locations"
-                    ? `Rak ${selectedRack?.code || "—"} · penomoran dimulai dari 01 untuk setiap rak.`
+                    ? `Rak ${selectedRack?.code || "—"} · ketik nomor penempatan yang benar-benar digunakan.`
                     : `Blok ${selectedBlock?.code || "—"} · penomoran rak dimulai dari 01 untuk setiap blok.`}
                 </p>
               </div>
@@ -395,8 +387,7 @@ export function LocationManager() {
               }
             />
             <p className="text-xs text-slate-400 mt-5">
-              Buat ruangan, blok, rak, lalu posisi. Untuk memindahkan barang,
-              gunakan Edit Barang; histori posisi lama tetap disimpan.
+              Ruangan 1–5, Blok A–D, dan Rak 01–25 sudah disiapkan. Tambahkan posisi hanya saat diperlukan. Posisi yang sudah ditempati barang aktif tidak dapat dipakai barang lain.
             </p>
           </form>
         </Card>
