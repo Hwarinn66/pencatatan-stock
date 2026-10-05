@@ -23,7 +23,7 @@ Hierarki: **Ruangan → Blok → Rak → Nomor penempatan barang**.
 - Nomor posisi unik **per rak**, sehingga posisi 1 pada rak A.01 dan A.02 diperbolehkan. Nomor rak unik per blok. Nomor ditampilkan minimal dua digit, tanpa memotong angka di atas 99.
 - Layout standar sudah disiapkan: **Ruangan 1–5**, setiap ruangan memiliki **Blok A–D**, dan setiap blok memiliki **Rak 01–25**.
 - Kode blok unik **per ruangan**, sehingga Blok A boleh ada di Ruangan 1, Ruangan 2, dan seterusnya. Kode posisi seperti A.01.01 juga boleh berulang di ruangan berbeda; nama ruangan selalu ditampilkan sebagai pembeda.
-- **Nomor penempatan tidak dibuat otomatis.** Buka **Lokasi Gudang → Posisi Barang**, pilih rak, lalu ketik nomor penempatan yang benar-benar digunakan. Satu nomor posisi hanya boleh ada sekali pada rak yang sama.
+- **Nomor penempatan diinput langsung saat Tambah/Edit Barang.** Setelah memilih ruangan, blok, dan rak, ketik nomor posisi yang ingin dipakai. Backend membuat record posisi otomatis bila belum ada. Jika posisi pada rak tersebut sudah ditempati barang aktif, penyimpanan ditolak.
 - Tambah/Edit Barang memakai empat pilihan bertingkat. Posisi terisi ditandai dan tidak dapat dipilih untuk barang lain. Backend dan UNIQUE constraint tetap menjadi pengaman akhir terhadap dua request bersamaan.
 - UUID QR tetap **per barang**, bukan per rak; tempel label pada **posisi barang** masing-masing. IN/OUT, anti-double-scan dan approval tidak berubah.
 - Identitas blok/rak yang sudah berisi anak dan identitas posisi yang sudah dipakai tidak dapat diganti. Buat lokasi tujuan dan pindahkan barang lewat Edit Barang. Nama/keterangan tetap dapat diedit. Histori menyimpan kode lokasi dan nama ruangan saat transaksi.
@@ -132,7 +132,7 @@ Restart server setelah mengubah `.env.local`. Jangan commit `.env.local`, `.env.
 
 ## Data awal
 
-Instalasi baru tidak membuat barang contoh. Dashboard dimulai tanpa barang dan tanpa histori transaksi. Struktur gudang awal berisi Ruangan 1–5, Blok A–D pada setiap ruangan, dan Rak 01–25 pada setiap blok. Nomor penempatan belum dibuat dan diisi manual sesuai kebutuhan.
+Instalasi baru tidak membuat barang contoh. Dashboard dimulai tanpa barang dan tanpa histori transaksi. Struktur gudang awal berisi Ruangan 1–5, Blok A–D pada setiap ruangan, dan Rak 01–25 pada setiap blok. Nomor penempatan dibuat otomatis saat Anda mengetiknya pada form Tambah/Edit Barang.
 
 Untuk mengosongkan database operasional yang sudah dipakai dan kembali ke kondisi awal tanpa menghapus akun login, kategori, atau struktur lokasi gudang:
 
@@ -189,7 +189,7 @@ Lihat [Next.js CLI — HTTPS](https://nextjs.org/docs/app/api-reference/cli/next
 
 ## Penggunaan
 
-- **Tambah Barang**: Kode Barang unik, nama, kategori, satuan dan posisi barang wajib. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
+- **Tambah Barang**: Kode Barang unik, nama, kategori, satuan, ruangan, blok, rak, dan nomor penempatan wajib. Nomor penempatan diketik langsung; posisi dibuat otomatis bila belum ada dan ditolak jika sudah ditempati barang aktif. Tidak ada input stok. Foto PNG/JPEG/WebP maksimum 1 MB, disimpan di MySQL; SVG tidak diterima.
 - **QR Barang**: download SVG, Print QR dengan nama/SKU/lokasi lengkap dan ruangan. QR hanya memuat UUID, bukan SKU atau nomor rak. Regenerate membatalkan token lama; cetak dan ganti label setelahnya.
 - **Scanner HP**: mode IN/OUT → scan → tampilkan hasil backend. Kamera berhenti sementara setelah pembacaan; tombol **Scan berikutnya** mengaktifkan lagi. Ini menghindari spam kamera, sementara aturan anti-double scan yang sebenarnya berada di database, tanpa cooldown waktu.
 - **Transaksi Pending**: isi bilangan bulat positif, lihat preview, Approve atau Batalkan. Quantity dapat juga disimpan lewat endpoint PATCH. UI approve mengirim quantity secara atomik sehingga tidak ada ketergantungan penyimpanan draft.
