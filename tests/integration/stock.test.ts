@@ -98,23 +98,20 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
   await t.test(
     "multiple products in one rack, independent numbering per rack",
     async () => {
-      const slot2 = (
-        await mutateLocation("locations", "POST", undefined, {
-          rack_id: rack,
-          position_number: 2,
-          name: "Posisi 02",
-        })
-      ).id!;
       const other = (
         await createProduct({
           sku: "SLOT-2",
           name: "Keyboard",
           unit: "PCS",
           category_id: category,
-          location_id: slot2,
+          rack_id: rack,
+          position_number: 2,
         })
       ).id;
       const available = await listLocations("locations");
+      const slot2 = available.find(
+        (l) => l.rack_id === rack && l.position_number === 2,
+      )!.id;
       assert.equal(available.find((l) => l.id === location)?.code, "T.01.01");
       assert.equal(available.find((l) => l.id === slot2)?.code, "T.01.02");
       await assert.rejects(
@@ -260,7 +257,8 @@ test("end-to-end SQL inventory and concurrency", async (t) => {
         name: "Keyboard",
         unit: "PCS",
         category_id: category,
-        location_id: location,
+        rack_id: rack,
+        position_number: 1,
       }),
       { code: "LOCATION_IN_USE" },
     );
