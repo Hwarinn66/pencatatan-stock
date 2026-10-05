@@ -15,7 +15,8 @@
     "test:migration": "node --env-file=.env.test --import tsx --test tests/migrations/*.test.ts",
     "test:reports": "node --env-file=.env.test --import tsx --test tests/reports/*.test.ts",
     "stock:reset": "node --env-file=.env.local --import tsx scripts/reset-stock.ts",
-    "user:password": "node --env-file=.env.local --import tsx scripts/update-user-password.ts"
+    "user:password": "node --env-file=.env.local --import tsx scripts/update-user-password.ts",
+    "data:reset": "node --env-file=.env.local --import tsx scripts/reset-operational-data.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.0",
