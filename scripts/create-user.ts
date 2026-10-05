@@ -4,11 +4,11 @@ const [username, password] = process.argv.slice(2);
 if (
   !username ||
   !password ||
-  password.length < 12 ||
+  password.length < 8 ||
   Buffer.byteLength(password) > 72
 ) {
   console.error(
-    'Gunakan: npm run user:create -- admin "PasswordMinimal12Karakter" (maks. 72 byte)',
+    'Gunakan: npm run user:create -- admin "PasswordMinimal8Karakter" (maks. 72 byte)',
   );
   process.exit(1);
 }

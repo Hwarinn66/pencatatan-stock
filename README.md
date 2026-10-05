@@ -107,11 +107,11 @@ Pengujian `npm run test:reports` memastikan label manual terpisah dari OUT, term
    Copy-Item .env.example .env.local
    ```
    Isi `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`. Credential tidak disimpan dalam source code. Untuk Laragon standar user sering `root` dengan password kosong; sesuaikan instalasi Anda.
-6. Buat akun. **Tidak ada password default / akun publik dalam seed.** Gunakan password pribadi minimal 12 karakter, maksimal 72 byte:
+6. Buat akun. **Tidak ada password default / akun publik dalam seed.** Gunakan password pribadi minimal 8 karakter, maksimal 72 byte:
    ```powershell
    npm run user:create -- admin "GantiDenganPasswordPribadiAnda"
    ```
-   Password di-hash bcrypt cost 12. Perintah membuat akun baru, tidak menimpa akun yang ada. Hindari membagikan history terminal yang berisi password. Bila password mengandung `$` atau karakter khusus PowerShell, gunakan petik tunggal.
+   Password di-hash bcrypt cost 12. Perintah membuat akun baru, tidak menimpa akun yang ada. Untuk mengganti password user yang sudah ada, gunakan `npm run user:password -- admin "PASSWORD-BARU"`. Hindari membagikan history terminal yang berisi password. Bila password mengandung `$` atau karakter khusus PowerShell, gunakan petik tunggal.
 7. Jalankan:
    ```powershell
    npm run dev
@@ -131,11 +131,11 @@ Restart server setelah mengubah `.env.local`. Jangan commit `.env.local`, `.env.
 
 | SKU     | Barang                 | Lokasi  | Stock | Status  |
 | ------- | ---------------------- | ------- | ----: | ------- |
-| BRG-001 | Mouse Logitech M331    | A.01.01 |    25 | Aman    |
-| BRG-002 | Keyboard Logitech K120 | A.02.01 |     2 | Menipis |
+| BRG-001 | Mouse Logitech M331    | A.01.01 |     0 | Habis   |
+| BRG-002 | Keyboard Logitech K120 | A.02.01 |     0 | Habis   |
 | BRG-003 | HDMI Cable 2 Meter     | B.01.01 |     0 | Habis   |
 
-Kategori: Elektronik, Kabel, ATK, Sparepart. Posisi kosong: A.03.01 dan A.05.01. Stok seed adalah saldo awal contoh; tidak dihitung sebagai IN hari ini. Untuk uji tambah barang, gunakan SKU baru (mis. BRG-004) dan posisi kosong karena BRG-001/A.01.01 sudah dipakai seed.
+Kategori: Elektronik, Kabel, ATK, Sparepart. Posisi kosong: A.03.01 dan A.05.01. Seluruh stok seed dimulai dari 0 agar saldo awal dapat diisi sendiri. Untuk mereset stok database yang sudah berjalan ke 0, gunakan `npm run stock:reset`. Untuk uji tambah barang, gunakan SKU baru (mis. BRG-004) dan posisi kosong karena BRG-001/A.01.01 sudah dipakai seed.
 
 ## Akses dari smartphone
 
