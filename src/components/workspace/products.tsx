@@ -379,18 +379,29 @@ export function ProductForm({ id }: { id?: number }) {
               category_id: Number(f.get("category_id")),
               unit: String(f.get("unit")),
               movement_class: f.get("movement_class") || null,
-              location_id: Number(f.get("location_id")),
+              rack_id: Number(f.get("rack_id")),
+              position_number: Number(f.get("position_number")),
               description: String(f.get("description")),
               image,
               ...(!id ? { sku: String(f.get("sku")) } : {}),
             };
-            if (initial && input.location_id !== initial.location_id) {
-              const target = locations.data?.find(
-                (l) => l.id === input.location_id,
+            if (
+              initial &&
+              (input.rack_id !== initial.rack_id ||
+                input.position_number !== initial.position_number)
+            ) {
+              const targetRack = racks.data?.find(
+                (item) => item.id === input.rack_id,
               );
+              const targetCode = `${targetRack?.block_code || ""}.${String(
+                targetRack?.rack_number || 0,
+              ).padStart(2, "0")}.${String(input.position_number).padStart(
+                2,
+                "0",
+              )}`;
               if (
                 !confirm(
-                  `Anda akan memindahkan ${initial.name} dari posisi ${initial.location_code} ke posisi ${target?.code}. Lanjutkan?`,
+                  `Anda akan memindahkan ${initial.name} dari posisi ${initial.location_code} ke posisi ${targetCode}. Lanjutkan?`,
                 )
               )
                 return;
