@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { LocationLookup } from "@/types";
+import { Input } from "@/components/ui/input";
 
 export function LocationPicker({
   rooms,
@@ -21,11 +22,20 @@ export function LocationPicker({
   const [room, setRoom] = useState(String(initial?.room_id || ""));
   const [block, setBlock] = useState(String(initial?.block_id || ""));
   const [rack, setRack] = useState(String(initial?.rack_id || ""));
-  const [position, setPosition] = useState(String(initialId || ""));
+  const [position, setPosition] = useState(
+    initial?.position_number ? String(initial.position_number) : "",
+  );
 
-  const positions = locations.filter((l) => l.active || l.id === initialId);
-  const selected = locations.find((l) => String(l.id) === position);
-  const rackPositions = positions.filter((l) => String(l.rack_id) === rack);
+  const rackPositions = locations.filter(
+    (item) => item.active && String(item.rack_id) === rack,
+  );
+  const occupied = rackPositions.find(
+    (item) => String(item.position_number) === position,
+  );
+  const selectedRack = racks.find((item) => String(item.id) === rack);
+  const selectedBlock = blocks.find(
+    (item) => item.id === selectedRack?.block_id,
+  );
 
   return (
     <fieldset className="sm:col-span-2 rounded-xl border border-slate-200 p-4">
@@ -82,9 +92,10 @@ export function LocationPicker({
         </div>
 
         <div>
-          <label htmlFor="product-rack">Rak</label>
+          <label htmlFor="rack_id">Rak</label>
           <select
-            id="product-rack"
+            id="rack_id"
+            name="rack_id"
             className="w-full"
             required
             disabled={!block}
@@ -106,39 +117,38 @@ export function LocationPicker({
         </div>
 
         <div>
-          <label htmlFor="location_id">Nomor penempatan</label>
-          <select
-            id="location_id"
-            name="location_id"
-            className="w-full"
+          <label htmlFor="position_number">Nomor penempatan</label>
+          <Input
+            id="position_number"
+            name="position_number"
+            type="number"
+            min={1}
+            max={999999}
+            step={1}
             required
             disabled={!rack}
             value={position}
+            placeholder="Contoh: 1"
             onChange={(e) => setPosition(e.target.value)}
-          >
-            <option value="">Pilih posisi</option>
-            {rackPositions.map((item) => (
-              <option
-                key={item.id}
-                value={item.id}
-                disabled={!!item.product_id && item.product_id !== productId}
-              >
-                {String(item.position_number).padStart(2, "0")}
-                {item.product_id && item.product_id !== productId
-                  ? ` · Terisi: ${item.product_name}`
-                  : " · Tersedia"}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </div>
 
-      <p className="text-xs mt-3 text-emerald-700">
-        {selected
-          ? `${selected.room_name} / ${selected.code}`
-          : rack && rackPositions.length === 0
-            ? "Rak ini belum memiliki nomor penempatan. Buat posisi melalui menu Lokasi Gudang → Posisi Barang."
-            : "Pilih ruangan → blok → rak → posisi."}
+      <p
+        className={
+          "text-xs mt-3 " +
+          (occupied && occupied.product_id !== productId
+            ? "text-red-700"
+            : "text-emerald-700")
+        }
+      >
+        {!rack
+          ? "Pilih ruangan → blok → rak, lalu ketik nomor penempatan."
+          : !position
+            ? "Ketik nomor penempatan yang ingin dipakai."
+            : occupied && occupied.product_id !== productId
+              ? `Posisi ${position} sudah ditempati oleh ${occupied.product_name}. Pilih nomor lain.`
+              : `${rooms.find((item) => String(item.id) === room)?.name || ""} / ${selectedBlock?.code || ""}.${String(selectedRack?.rack_number || 0).padStart(2, "0")}.${String(Number(position)).padStart(2, "0")} · tersedia`}
       </p>
     </fieldset>
   );
