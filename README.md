@@ -127,15 +127,17 @@ npm start
 
 Restart server setelah mengubah `.env.local`. Jangan commit `.env.local`, `.env.test`, atau private key sertifikat.
 
-## Seed data
+## Data awal
 
-| SKU     | Barang                 | Lokasi  | Stock | Status  |
-| ------- | ---------------------- | ------- | ----: | ------- |
-| BRG-001 | Mouse Logitech M331    | A.01.01 |     0 | Habis   |
-| BRG-002 | Keyboard Logitech K120 | A.02.01 |     0 | Habis   |
-| BRG-003 | HDMI Cable 2 Meter     | B.01.01 |     0 | Habis   |
+Instalasi baru tidak membuat barang contoh. Dashboard dimulai tanpa barang dan tanpa histori transaksi. Kategori serta struktur lokasi contoh tetap tersedia agar Anda bisa langsung menambahkan barang sendiri.
 
-Kategori: Elektronik, Kabel, ATK, Sparepart. Posisi kosong: A.03.01 dan A.05.01. Seluruh stok seed dimulai dari 0 agar saldo awal dapat diisi sendiri. Untuk mereset stok database yang sudah berjalan ke 0, gunakan `npm run stock:reset`. Untuk uji tambah barang, gunakan SKU baru (mis. BRG-004) dan posisi kosong karena BRG-001/A.01.01 sudah dipakai seed.
+Untuk mengosongkan database operasional yang sudah dipakai dan kembali ke kondisi awal tanpa menghapus akun login, kategori, atau struktur lokasi gudang:
+
+```powershell
+npm run data:reset -- --yes
+```
+
+Perintah ini menghapus seluruh barang, transaksi pending, histori IN/OUT/adjustment, counter nomor transaksi, dan event realtime. ID barang/transaksi juga dimulai kembali dari 1. Gunakan hanya setelah backup bila data lama masih diperlukan.
 
 ## Akses dari smartphone
 
