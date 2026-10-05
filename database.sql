@@ -108,8 +108,5 @@ INSERT INTO locations(rack_id,position_number,code,name) VALUES
  (1,1,'A.01.01','Posisi 01'),(2,1,'A.02.01','Posisi 01'),(3,1,'B.01.01','Posisi 01'),
  (4,1,'A.03.01','Posisi 01'),(5,1,'A.05.01','Posisi 01'),
  (1,2,'A.01.02','Posisi 02'),(2,2,'A.02.02','Posisi 02'),(2,3,'A.02.03','Posisi 03');
-INSERT INTO products(sku,name,category_id,unit,stock,location_id,qr_token) VALUES
- ('BRG-001','Mouse Logitech M331',1,'PCS',0,1,'550e8400-e29b-41d4-a716-446655440001'),
- ('BRG-002','Keyboard Logitech K120',1,'PCS',0,2,'550e8400-e29b-41d4-a716-446655440002'),
- ('BRG-003','HDMI Cable 2 Meter',2,'PCS',0,3,'550e8400-e29b-41d4-a716-446655440003');
+-- Tidak ada barang contoh. Isi data barang sendiri melalui aplikasi.
 -- Tidak ada password default. Buat akun dengan npm run user:create -- admin "PASSWORD-ANDA".
