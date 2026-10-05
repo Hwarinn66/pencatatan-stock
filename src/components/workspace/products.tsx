@@ -321,6 +321,9 @@ export function ProductsPage({ low = false }: { low?: boolean }) {
 export function ProductForm({ id }: { id?: number }) {
   const router = useRouter();
   const categories = useData<Lookup[]>("categories");
+  const rooms = useData<LocationLookup[]>("rooms");
+  const blocks = useData<LocationLookup[]>("blocks");
+  const racks = useData<LocationLookup[]>("racks");
   const locations = useData<LocationLookup[]>("locations");
   const [initial, setInitial] = useState<Product>();
   const [image, setImage] = useState<string | null>(null);
@@ -342,10 +345,29 @@ export function ProductForm({ id }: { id?: number }) {
         description="Satu barang, satu posisi aktif, satu QR. Stok awal barang baru adalah 0."
       />
       <State
-        error={error || categories.error || locations.error}
-        loading={(!!id && !initial) || !categories.data || !locations.data}
+        error={
+          error ||
+          categories.error ||
+          rooms.error ||
+          blocks.error ||
+          racks.error ||
+          locations.error
+        }
+        loading={
+          (!!id && !initial) ||
+          !categories.data ||
+          !rooms.data ||
+          !blocks.data ||
+          !racks.data ||
+          !locations.data
+        }
       />
-      {(!id || initial) && categories.data && locations.data && (
+      {(!id || initial) &&
+        categories.data &&
+        rooms.data &&
+        blocks.data &&
+        racks.data &&
+        locations.data && (
         <form
           key={initial?.id || "new"}
           className="max-w-3xl"
@@ -470,6 +492,9 @@ export function ProductForm({ id }: { id?: number }) {
                 </p>
               </div>
               <LocationPicker
+                rooms={rooms.data}
+                blocks={blocks.data}
+                racks={racks.data}
                 locations={locations.data}
                 initialId={initial?.location_id}
                 productId={id}
@@ -534,11 +559,28 @@ export function ProductForm({ id }: { id?: number }) {
               >
                 Kembali
               </Button>
-              <Button disabled={busy || !categories.data || !locations.data}>
+              <Button
+                disabled={
+                  busy ||
+                  !categories.data ||
+                  !rooms.data ||
+                  !blocks.data ||
+                  !racks.data ||
+                  !locations.data
+                }
+              >
                 {busy ? "Menyimpan…" : "Simpan Barang"}
               </Button>
             </div>
-            <State error={categories.error || locations.error} />
+            <State
+              error={
+                categories.error ||
+                rooms.error ||
+                blocks.error ||
+                racks.error ||
+                locations.error
+              }
+            />
           </Card>
         </form>
       )}
