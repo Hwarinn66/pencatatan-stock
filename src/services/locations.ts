@@ -13,11 +13,11 @@ export async function listLocations(kind: LocationKind) {
   if (kind === "rooms") return rows("SELECT * FROM rooms ORDER BY name");
   if (kind === "blocks")
     return rows(
-      "SELECT b.*,rm.name room_name FROM blocks b JOIN rooms rm ON rm.id=b.room_id ORDER BY b.code",
+      "SELECT b.*,rm.name room_name FROM blocks b JOIN rooms rm ON rm.id=b.room_id ORDER BY rm.name,b.code",
     );
   if (kind === "racks")
     return rows(
-      "SELECT r.*,b.code block_code,b.room_id,rm.name room_name,CONCAT(b.code,'.',IF(r.rack_number<10,CONCAT('0',r.rack_number),r.rack_number)) code FROM racks r JOIN blocks b ON b.id=r.block_id JOIN rooms rm ON rm.id=b.room_id ORDER BY b.code,r.rack_number",
+      "SELECT r.*,b.code block_code,b.room_id,rm.name room_name,CONCAT(b.code,'.',IF(r.rack_number<10,CONCAT('0',r.rack_number),r.rack_number)) code FROM racks r JOIN blocks b ON b.id=r.block_id JOIN rooms rm ON rm.id=b.room_id ORDER BY rm.name,b.code,r.rack_number",
     );
   return rows(
     `SELECT l.*,${hierarchyFields},p.id product_id,p.name product_name,p.sku product_sku FROM locations l ${hierarchyJoins} LEFT JOIN products p ON p.location_id=l.id AND p.active=1 ORDER BY rm.name,b.code,r.rack_number,l.position_number`,
