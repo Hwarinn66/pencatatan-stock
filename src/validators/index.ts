@@ -5,14 +5,17 @@ export const scanSchema = z.object({
   qr_token: z.string().uuid(),
   mode: z.enum(["IN", "OUT"]),
 });
-export const productSchema = z
+const productBaseSchema = z
   .object({
     sku: z.string().trim().min(1).max(64),
     name: z.string().trim().min(1).max(160),
     category_id: idSchema,
     unit: z.string().trim().min(1).max(20),
     movement_class: z.enum(["FAST", "SLOW"]).nullable().optional(),
-    location_id: idSchema,
+    // location_id dipertahankan untuk kompatibilitas API lama.
+    location_id: idSchema.optional(),
+    rack_id: idSchema.optional(),
+    position_number: z.coerce.number().int().min(1).max(999999).optional(),
     description: z.string().max(5000).nullable().optional(),
     image: z
       .string()
@@ -23,7 +26,48 @@ export const productSchema = z
     active: z.boolean().optional(),
   })
   .strict();
-export const editProductSchema = productSchema.omit({ sku: true }).partial();
+
+export const productSchema = productBaseSchema.superRefine((value, ctx) => {
+  const direct = value.rack_id !== undefined || value.position_number !== undefined;
+  if (
+    value.location_id === undefined &&
+    !(value.rack_id !== undefined && value.position_number !== undefined)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["position_number"],
+      message: "Pilih rak dan isi nomor penempatan.",
+    });
+  }
+  if (
+    direct &&
+    (value.rack_id === undefined || value.position_number === undefined)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["position_number"],
+      message: "Rak dan nomor penempatan harus diisi bersamaan.",
+    });
+  }
+});
+
+export const editProductSchema = productBaseSchema
+  .omit({ sku: true })
+  .partial()
+  .superRefine((value, ctx) => {
+    const direct =
+      value.rack_id !== undefined || value.position_number !== undefined;
+    if (
+      direct &&
+      (value.rack_id === undefined || value.position_number === undefined)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["position_number"],
+        message: "Rak dan nomor penempatan harus diisi bersamaan.",
+      });
+    }
+  });
 export const adjustmentSchema = z.object({
   product_id: idSchema,
   physical_stock: z.number().int().min(0).max(2147483647),
